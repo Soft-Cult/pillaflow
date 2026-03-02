@@ -54,6 +54,7 @@ import {
 import {
   normalizeBadgeSlots,
   normalizeAchievementBadgeId,
+  parseBadgeId,
   computeAchievementMetrics,
   computeEarnedAchievementBadges,
 } from '../utils/achievements';
