@@ -2432,22 +2432,94 @@ const buildAchievementBadgeCatalogFromRows = (rows = []) => {
   return nextCatalog;
 };
 
+const normalizeLegacyAchievementIdentifier = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return null;
+
+  const directBadgeId = normalizeAchievementBadgeId(normalized);
+  if (directBadgeId) {
+    const parsed = parseBadgeId(directBadgeId);
+    return parsed
+      ? {
+          badgeId: parsed.badgeId,
+          achievementKey: parsed.achievementId,
+          milestoneValue: parsed.milestone,
+        }
+      : null;
+  }
+
+  let match = normalized.match(/^(longest_current_streak|longest_habit_streak)_(\d+)_days?$/);
+  if (match) {
+    const achievementKey = match[1];
+    const milestoneValue = Number(match[2]);
+    const badgeId = normalizeAchievementBadgeId(`${achievementKey}:${milestoneValue}`);
+    return badgeId ? { badgeId, achievementKey, milestoneValue } : null;
+  }
+
+  match = normalized.match(/^(total_habit_completions|total_habits_achieved)_(\d+)$/);
+  if (match) {
+    const achievementKey = match[1];
+    const milestoneValue = Number(match[2]);
+    const badgeId = normalizeAchievementBadgeId(`${achievementKey}:${milestoneValue}`);
+    return badgeId ? { badgeId, achievementKey, milestoneValue } : null;
+  }
+
+  match = normalized.match(/^account_age_(\d+)_days?$/);
+  if (match) {
+    const days = Number(match[1]);
+    const daysToMonths = {
+      30: 1,
+      90: 3,
+      180: 6,
+      275: 9,
+      365: 12,
+      730: 24,
+      1095: 36,
+      1460: 48,
+      1825: 60,
+    };
+    const milestoneValue = daysToMonths[days];
+    if (!milestoneValue) return null;
+    const achievementKey = 'account_age';
+    const badgeId = normalizeAchievementBadgeId(`${achievementKey}:${milestoneValue}`);
+    return badgeId ? { badgeId, achievementKey, milestoneValue } : null;
+  }
+
+  return null;
+};
+
 const mapAchievementUnlockRows = (rows = []) => {
   const nextUnlocks = {};
   (rows || []).forEach((row) => {
-    const milestoneValue = Number(row?.milestone_value);
+    const numericMilestoneValue = Number(row?.milestone_value);
     const rawBadgeId =
       row?.badge_id ||
-      (row?.achievement_key && Number.isFinite(milestoneValue)
-        ? `${row.achievement_key}:${milestoneValue}`
-        : null);
-    const badgeId = normalizeAchievementBadgeId(rawBadgeId);
-    if (!badgeId) return;
-    const [achievementKey] = badgeId.split(':');
-    nextUnlocks[badgeId] = {
-      badgeId,
-      achievementKey: row?.achievement_key || achievementKey || null,
-      milestoneValue: Number.isFinite(milestoneValue) ? milestoneValue : null,
+      (row?.achievement_key && Number.isFinite(numericMilestoneValue)
+        ? `${row.achievement_key}:${numericMilestoneValue}`
+        : row?.badge_key || row?.achievement_key || null);
+
+    let parsed = rawBadgeId ? normalizeLegacyAchievementIdentifier(rawBadgeId) : null;
+
+    if (!parsed && row?.achievement_key) {
+      parsed = normalizeLegacyAchievementIdentifier(row.achievement_key);
+    }
+
+    if (!parsed && row?.badge_key) {
+      parsed = normalizeLegacyAchievementIdentifier(row.badge_key);
+    }
+
+    if (!parsed && row?.achievement_key && Number.isFinite(numericMilestoneValue)) {
+      parsed = normalizeLegacyAchievementIdentifier(`${row.achievement_key}:${numericMilestoneValue}`);
+    }
+
+    if (!parsed) return;
+
+    nextUnlocks[parsed.badgeId] = {
+      badgeId: parsed.badgeId,
+      achievementKey: parsed.achievementKey || row?.achievement_key || null,
+      milestoneValue: Number.isFinite(numericMilestoneValue)
+        ? numericMilestoneValue
+        : parsed.milestoneValue,
       unlockedAt: row?.unlocked_at || row?.created_at || null,
     };
   });
@@ -2674,6 +2746,19 @@ const serializeAchievementUnlocksForProfile = (unlockMap = {}) =>
         rows = [];
       } else {
         rows = tableResult.data || [];
+      }
+    }
+
+    if (!rows.length) {
+      const legacyResult = await supabase
+        .from('user_achievements')
+        .select('achievement_key, unlocked_at, created_at')
+        .eq('user_id', authUser.id);
+
+      if (!legacyResult.error) {
+        rows = legacyResult.data || [];
+      } else if (!isMissingRelationError(legacyResult.error, 'user_achievements')) {
+        console.log('Error fetching legacy user achievements:', legacyResult.error);
       }
     }
 
