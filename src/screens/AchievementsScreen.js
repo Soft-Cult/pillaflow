@@ -12,7 +12,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useApp } from '../context/AppContext';
 import { AchievementBadge, ProfileBadgeSlots } from '../components';
-import { buildAchievementSections, computeAchievementMetrics } from '../utils/achievements';
+import {
+  buildAchievementSections,
+  computeAchievementMetrics,
+  getBadgeDetails,
+} from '../utils/achievements';
 import {
   colors,
   borderRadius,
@@ -31,6 +35,7 @@ const AchievementsScreen = () => {
     getCurrentStreak,
     achievementBadgeCatalog,
     achievementUnlockedBadgeIds,
+    achievementUnlockList,
     setProfileBadgeSlot,
     themeColors,
     themeName,
@@ -83,6 +88,24 @@ const AchievementsScreen = () => {
       ),
     [achievementSections]
   );
+  const unlockedBadgeHistory = React.useMemo(
+    () =>
+      (achievementUnlockList || [])
+        .map((entry) => {
+          const details = getBadgeDetails(entry?.badgeId);
+          if (!details) return null;
+          const unlockedDateMs = entry?.unlockedAt ? new Date(entry.unlockedAt).getTime() : NaN;
+          return {
+            ...entry,
+            ...details,
+            unlockedDateLabel: Number.isFinite(unlockedDateMs)
+              ? new Date(unlockedDateMs).toLocaleDateString()
+              : 'Saved',
+          };
+        })
+        .filter(Boolean),
+    [achievementUnlockList]
+  );
 
   const handleAssignBadge = React.useCallback(
     (badge) => {
@@ -125,6 +148,20 @@ const AchievementsScreen = () => {
           <Text style={styles.summaryValue}>{unlockedBadgeCount}</Text>
           <Text style={styles.summarySubtitle}>Tap any unlocked achievement to equip it to slot 1, 2, or 3.</Text>
         </View>
+
+        {unlockedBadgeHistory.length ? (
+          <View style={styles.historyCard}>
+            <Text style={styles.historyTitle}>Unlocked history</Text>
+            {unlockedBadgeHistory.map((entry) => (
+              <View key={entry.badgeId} style={styles.historyRow}>
+                <Text style={styles.historyLabel} numberOfLines={1}>
+                  {entry.title}: {entry.milestoneLabel}
+                </Text>
+                <Text style={styles.historyDate}>{entry.unlockedDateLabel}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         <ProfileBadgeSlots
           badgeSlots={profile?.badgeSlots}
@@ -218,6 +255,39 @@ const createStyles = (themeColorsParam = colors, isDark = false) => {
     summarySubtitle: {
       ...typography.bodySmall,
       color: mutedText,
+    },
+    historyCard: {
+      borderRadius: borderRadius.xl,
+      borderWidth: 1,
+      borderColor: isDark ? '#1E293B' : '#E2E8F0',
+      backgroundColor: isDark ? 'rgba(15,23,42,0.55)' : '#FFFFFF',
+      padding: spacing.md,
+      marginBottom: spacing.lg,
+    },
+    historyTitle: {
+      ...typography.body,
+      color: baseText,
+      fontWeight: '700',
+      marginBottom: spacing.xs,
+    },
+    historyRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+      paddingVertical: 4,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? 'rgba(148,163,184,0.18)' : '#F1F5F9',
+    },
+    historyLabel: {
+      ...typography.bodySmall,
+      color: baseText,
+      flex: 1,
+    },
+    historyDate: {
+      ...typography.caption,
+      color: mutedText,
+      fontWeight: '600',
     },
     achievementSection: {
       marginTop: spacing.lg,

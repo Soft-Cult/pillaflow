@@ -264,6 +264,12 @@ create policy "user_achievement_unlocks_delete_own"
   to authenticated
   using (auth.uid() = user_id);
 
+-- Optional profile-level fallback mirror for unlock history.
+-- This allows the app to keep an account-scoped unlock list even if
+-- RPC/table routes are unavailable in older environments.
+alter table if exists public.profiles
+  add column if not exists achievement_unlocks jsonb not null default '[]'::jsonb;
+
 -- 3) RPCs
 drop function if exists public.unlock_achievement(text, integer);
 create or replace function public.unlock_achievement(
