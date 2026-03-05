@@ -18,12 +18,58 @@ export type Proposal = {
 
 export type ProposalRow = Proposal;
 
+async function getAuthHeaderOrThrow() {
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  if (error) {
+    throw new Error(`Auth session error: ${error.message || String(error)}`);
+  }
+
+  const token = session?.access_token;
+  if (!token) {
+    throw new Error("No active auth session. Please sign in again.");
+  }
+
+  return { Authorization: `Bearer ${token}` };
+}
+
+async function unwrapFunctionError(error: any, fallbackMessage: string) {
+  const response = error?.context;
+  if (response && typeof response.status === "number") {
+    let bodyText = "";
+    try {
+      bodyText = await response.text();
+    } catch {
+      // ignore body parsing errors
+    }
+
+    const compactBody = String(bodyText || "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 600);
+
+    const detail = compactBody
+      ? `${fallbackMessage} (HTTP ${response.status}): ${compactBody}`
+      : `${fallbackMessage} (HTTP ${response.status})`;
+    return new Error(detail);
+  }
+
+  return new Error(error?.message || fallbackMessage);
+}
+
 export async function callAgent(message: string, conversationId?: string | null) {
+  const headers = await getAuthHeaderOrThrow();
   const { data, error } = await supabase.functions.invoke("agent", {
     body: { message, conversationId }, // <--- add this
+    headers,
   });
 
-  if (error) throw error;
+  if (error) {
+    throw await unwrapFunctionError(error, "Agent function failed");
+  }
 
   return data as {
     assistantText: string;
@@ -51,11 +97,15 @@ export async function fetchProposalsByIds(ids: string[]) {
 
 // Approve = call your apply_action edge function
 export async function applyProposal(proposalId: string) {
+  const headers = await getAuthHeaderOrThrow();
   const { data, error } = await supabase.functions.invoke("apply_action", {
     body: { proposal_id: proposalId },
+    headers,
   });
 
-  if (error) throw error;
+  if (error) {
+    throw await unwrapFunctionError(error, "Apply action function failed");
+  }
   return data as { ok: true; appliedResult: any };
 }
 

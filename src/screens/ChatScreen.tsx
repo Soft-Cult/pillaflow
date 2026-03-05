@@ -97,6 +97,7 @@ function getProposalSummary(payload: any) {
 
 export default function ChatScreen() {
   const {
+    authUser,
     profile,
     themeColors,
     themeName,
@@ -290,6 +291,18 @@ export default function ChatScreen() {
     if (!isPremiumActive) return;
     const text = input.trim();
     if (!text || sending) return;
+    if (!authUser?.id) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `auth-${Date.now()}`,
+          role: "assistant",
+          text: "Please sign in again to use the AI assistant.",
+          time: formatTime(Date.now()),
+        },
+      ]);
+      return;
+    }
 
     setInput("");
     setSending(true);
