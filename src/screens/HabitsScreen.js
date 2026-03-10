@@ -1280,6 +1280,7 @@ const HabitsScreen = () => {
   );
   const styles = useMemo(() => createStyles(palette), [palette]);
   const [isHabitsHydrating, setIsHabitsHydrating] = useState(true);
+  const isHabitsInteractionLocked = isHabitsHydrating && (habits?.length || 0) === 0;
   const [isHabitSwipeActive, setIsHabitSwipeActive] = useState(false);
 
   useEffect(() => {
@@ -1975,7 +1976,7 @@ const HabitsScreen = () => {
   };
 
   const applyProgress = async (habit, amountValue) => {
-    if (isHabitsHydrating) return;
+    if (isHabitsInteractionLocked) return;
     if (hasHabitReachedEndDate(habit, new Date())) return;
     const amount = Math.max(0, parseNumber(amountValue, 0));
     const localKey = `${habit.id}|${selectedDateKey}`;
@@ -2008,7 +2009,7 @@ const HabitsScreen = () => {
 
   const handleQuickAddProgress = useCallback(
     async (habit) => {
-      if (!habit || !isSelectedDateToday || isHabitsHydrating) return;
+      if (!habit || !isSelectedDateToday || isHabitsInteractionLocked) return;
       if (hasHabitReachedEndDate(habit, new Date())) return;
 
       const currentAmount = Math.max(
@@ -2029,7 +2030,7 @@ const HabitsScreen = () => {
       if (nextAmount <= currentAmount) return;
       await applyProgress(habit, nextAmount);
     },
-    [applyProgress, isSelectedDateToday, isHabitsHydrating, localProgressMap, selectedDateKey]
+    [applyProgress, isSelectedDateToday, isHabitsInteractionLocked, localProgressMap, selectedDateKey]
   );
 
   const submitManualAmount = async () => {
@@ -2593,9 +2594,9 @@ const HabitsScreen = () => {
                 overdone={overdone}
                 streakFrozen={streakFrozen}
                 freezeEligible={isSelectedDateToday}
-                isInteractive={!isHabitsHydrating && isSelectedDateToday && !lifecycleCompleted}
+                isInteractive={!isHabitsInteractionLocked && isSelectedDateToday && !lifecycleCompleted}
                 onTap={(item) => {
-                  if (isHabitsHydrating && !lifecycleCompleted) return;
+                  if (isHabitsInteractionLocked && !lifecycleCompleted) return;
                   if (item.__isGroupHabit) {
                     setActiveHabitId(null);
                     setActiveGroupHabitId(item.id);

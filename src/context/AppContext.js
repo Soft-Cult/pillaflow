@@ -410,6 +410,8 @@ const getLastActiveKey = (userId) => `${STORAGE_KEYS.LAST_ACTIVE_PREFIX}${userId
 const getStreakFrozenKey = (userId) => `${STORAGE_KEYS.STREAK_FROZEN_PREFIX}${userId}`;
 const getCurrentStreakKey = (userId) => `${STORAGE_KEYS.CURRENT_STREAK_PREFIX}${userId}`;
 const getFoodLogsKey = (userId) => `${STORAGE_KEYS.HEALTH_FOOD_LOGS}_${userId || 'anon'}`;
+const getHabitsStorageKey = (userId) => `${STORAGE_KEYS.HABITS}_${userId || 'anon'}`;
+const getTasksStorageKey = (userId) => `${STORAGE_KEYS.TASKS}_${userId || 'anon'}`;
 const getProfileStorageKey = (userId) => `${STORAGE_KEYS.PROFILE}_${userId || 'anon'}`;
 const getCalendarSyncKey = (userId) =>
   `${STORAGE_KEYS.CALENDAR_SYNC_PREFIX}${userId || 'anon'}`;
@@ -1514,8 +1516,13 @@ const realtimeFriendRequestChannelRef = useRef(null);
 const realtimeFriendshipChannelRef = useRef(null);
 const friendDataPromiseRef = useRef(null);
 const healthDataPromiseRef = useRef(null);
+const habitsDataPromiseRef = useRef(null);
+const tasksDataPromiseRef = useRef(null);
 const healthSyncPromiseRef = useRef(null);
 const recurringFinanceSyncPromiseRef = useRef(null);
+const taskFetchStrategyRef = useRef(null);
+const habitsCacheReadyUserRef = useRef(null);
+const tasksCacheReadyUserRef = useRef(null);
 const realtimeEnabledRef = useRef(false);
 const profileCacheRef = useRef({});
 const friendSearchCacheRef = useRef(new Map());
@@ -2292,6 +2299,126 @@ const markDataLoaded = useCallback((key) => {
     },
     [setCachedProfile]
   );
+
+  const persistHabitsLocally = useCallback(async (userId, habitsData = []) => {
+    if (!userId) return;
+    try {
+      await AsyncStorage.setItem(
+        getHabitsStorageKey(userId),
+        JSON.stringify(Array.isArray(habitsData) ? habitsData : [])
+      );
+    } catch (err) {
+      console.log('Error caching habits:', err);
+    }
+  }, []);
+
+  const persistTasksLocally = useCallback(async (userId, tasksData = []) => {
+    if (!userId) return;
+    try {
+      await AsyncStorage.setItem(
+        getTasksStorageKey(userId),
+        JSON.stringify(Array.isArray(tasksData) ? tasksData : [])
+      );
+    } catch (err) {
+      console.log('Error caching tasks:', err);
+    }
+  }, []);
+
+  const hydrateCachedHabits = useCallback(async (userId) => {
+    if (!userId) return null;
+    try {
+      const storedHabits = await AsyncStorage.getItem(getHabitsStorageKey(userId));
+      if (!storedHabits) return null;
+      const parsed = JSON.parse(storedHabits);
+      if (!Array.isArray(parsed)) return null;
+      const normalizedHabits = parsed
+        .filter((habit) => habit && typeof habit === 'object' && habit.id)
+        .map((habit) => ({
+          ...habit,
+          streak: Math.max(0, Number(habit?.streak) || 0),
+          completedDates: Array.isArray(habit?.completedDates) ? habit.completedDates : [],
+          progressByDate:
+            habit?.progressByDate && typeof habit.progressByDate === 'object'
+              ? habit.progressByDate
+              : {},
+        }));
+      setHabits(normalizedHabits);
+      return normalizedHabits;
+    } catch (err) {
+      console.log('Error hydrating cached habits:', err);
+      return null;
+    }
+  }, []);
+
+  const hydrateCachedTasks = useCallback(async (userId) => {
+    if (!userId) return null;
+    try {
+      const storedTasks = await AsyncStorage.getItem(getTasksStorageKey(userId));
+      if (!storedTasks) return null;
+      const parsed = JSON.parse(storedTasks);
+      if (!Array.isArray(parsed)) return null;
+
+      const normalizedTasks = parsed
+        .filter((task) => task && typeof task === 'object' && task.id)
+        .map((task) => ({
+          ...task,
+          durationMinutes: normalizeTaskDurationMinutes(
+            task?.durationMinutes ?? task?.duration_minutes,
+            DEFAULT_TASK_DURATION_MINUTES
+          ),
+          category: normalizeTaskCategory(task?.category),
+        }))
+        .sort((a, b) => {
+          const aDate = new Date(`${a?.date || ''}T${a?.time || '00:00'}`);
+          const bDate = new Date(`${b?.date || ''}T${b?.time || '00:00'}`);
+          const aMs = Number.isNaN(aDate.getTime()) ? 0 : aDate.getTime();
+          const bMs = Number.isNaN(bDate.getTime()) ? 0 : bDate.getTime();
+          if (aMs !== bMs) return aMs - bMs;
+          const aCreated = new Date(a?.createdAt || 0).getTime();
+          const bCreated = new Date(b?.createdAt || 0).getTime();
+          return aCreated - bCreated;
+        });
+
+      setTasks(normalizedTasks);
+      setArchivedTasks([]);
+      return normalizedTasks;
+    } catch (err) {
+      console.log('Error hydrating cached tasks:', err);
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    const userId = authUser?.id || null;
+    habitsCacheReadyUserRef.current = null;
+    tasksCacheReadyUserRef.current = null;
+    if (!userId) return;
+
+    let isMounted = true;
+    const hydrate = async () => {
+      await Promise.all([hydrateCachedHabits(userId), hydrateCachedTasks(userId)]);
+      if (!isMounted) return;
+      habitsCacheReadyUserRef.current = userId;
+      tasksCacheReadyUserRef.current = userId;
+    };
+
+    hydrate();
+    return () => {
+      isMounted = false;
+    };
+  }, [authUser?.id, hydrateCachedHabits, hydrateCachedTasks]);
+
+  useEffect(() => {
+    if (!authUser?.id) return;
+    if (habitsCacheReadyUserRef.current !== authUser.id) return;
+    persistHabitsLocally(authUser.id, habits);
+  }, [authUser?.id, habits, persistHabitsLocally]);
+
+  useEffect(() => {
+    if (!authUser?.id) return;
+    if (tasksCacheReadyUserRef.current !== authUser.id) return;
+    persistTasksLocally(authUser.id, tasks);
+  }, [authUser?.id, tasks, persistTasksLocally]);
 
   const cacheThemeLocally = async (name) => {
     try {
@@ -5740,9 +5867,24 @@ const serializeAchievementUnlocksForProfile = (unlockMap = {}) =>
     async ({ force, ttl } = {}) => {
       const userId = authUser?.id;
       if (!userId) return;
+      if (!force && tasksDataPromiseRef.current) return tasksDataPromiseRef.current;
       if (!force && !shouldRefreshData('tasks', ttl)) return;
-      await fetchTasksFromSupabase(userId);
-      markDataLoaded('tasks');
+
+      const run = (async () => {
+        const loaded = await fetchTasksFromSupabase(userId);
+        if (loaded !== false) {
+          markDataLoaded('tasks');
+        }
+      })();
+
+      tasksDataPromiseRef.current = run;
+      try {
+        return await run;
+      } finally {
+        if (tasksDataPromiseRef.current === run) {
+          tasksDataPromiseRef.current = null;
+        }
+      }
     },
     [authUser?.id, markDataLoaded, shouldRefreshData]
   );
@@ -5762,9 +5904,24 @@ const serializeAchievementUnlocksForProfile = (unlockMap = {}) =>
     async ({ force, ttl } = {}) => {
       const userId = authUser?.id;
       if (!userId) return;
+      if (!force && habitsDataPromiseRef.current) return habitsDataPromiseRef.current;
       if (!force && !shouldRefreshData('habits', ttl)) return;
-      await fetchHabitsFromSupabase(userId);
-      markDataLoaded('habits');
+
+      const run = (async () => {
+        const loaded = await fetchHabitsFromSupabase(userId);
+        if (loaded !== false) {
+          markDataLoaded('habits');
+        }
+      })();
+
+      habitsDataPromiseRef.current = run;
+      try {
+        return await run;
+      } finally {
+        if (habitsDataPromiseRef.current === run) {
+          habitsDataPromiseRef.current = null;
+        }
+      }
     },
     [authUser?.id, markDataLoaded, shouldRefreshData]
   );
@@ -6410,7 +6567,7 @@ const fetchHabitsFromSupabase = async (userId, _groupListParam) => {
 
   if (ownedHabitError) {
     console.log('Error fetching habits:', ownedHabitError);
-    return;
+    return false;
   }
 
   let sharedHabitIds = [];
@@ -6580,6 +6737,7 @@ const fetchHabitsFromSupabase = async (userId, _groupListParam) => {
       }
     });
   }
+  return true;
 };
 
   const resetHabitStreaksByIds = useCallback(
@@ -7445,7 +7603,7 @@ const TASK_SELECT_VARIANTS_LEGACY_GROUP_CATEGORY =
   TASK_SELECT_VARIANTS_LEGACY_GROUP.map(withTaskCategoryField);
 
 const fetchTasksFromSupabase = async (userId) => {
-  if (shouldSkipNetworkRequests()) return;
+  if (shouldSkipNetworkRequests()) return false;
 
   const buildQuery = (table, selectFields) =>
     supabase
@@ -7456,89 +7614,54 @@ const fetchTasksFromSupabase = async (userId) => {
       .order('created_at', { ascending: true });
 
   const attempts = [];
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_WITH_DURATION_ARCHIVE_GROUP_CATEGORY.forEach((fields) => {
-      attempts.push({ table, fields });
-    });
-  });
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_WITH_DURATION_LEGACY_GROUP_CATEGORY.forEach((fields) => {
-      attempts.push({ table, fields });
-    });
-  });
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_WITH_DURATION_ARCHIVE_CATEGORY.forEach((fields) => {
-      attempts.push({ table, fields });
-    });
-  });
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_WITH_DURATION_LEGACY_CATEGORY.forEach((fields) => {
-      attempts.push({ table, fields });
-    });
-  });
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_WITH_ARCHIVE_GROUP_CATEGORY.forEach((fields) => {
-      attempts.push({ table, fields });
-    });
-  });
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_LEGACY_GROUP_CATEGORY.forEach((fields) => {
-      attempts.push({ table, fields });
-    });
-  });
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_WITH_ARCHIVE_CATEGORY.forEach((fields) => {
-      attempts.push({ table, fields });
-    });
-  });
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_LEGACY_CATEGORY.forEach((fields) => {
-      attempts.push({ table, fields });
-    });
-  });
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_WITH_DURATION_ARCHIVE_GROUP.forEach((fields) => {
-      attempts.push({ table, fields });
-    });
-  });
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_WITH_DURATION_LEGACY_GROUP.forEach((fields) => {
-      attempts.push({ table, fields });
-    });
-  });
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_WITH_DURATION_ARCHIVE.forEach((fields) => {
-      attempts.push({ table, fields });
-    });
-  });
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_WITH_DURATION_LEGACY.forEach((fields) => {
-      attempts.push({ table, fields });
-    });
-  });
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_WITH_ARCHIVE_GROUP.forEach((fields) => {
-      attempts.push({ table, fields });
-    });
-  });
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_LEGACY_GROUP.forEach((fields) => {
-      attempts.push({ table, fields });
-    });
-  });
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_WITH_ARCHIVE.forEach((fields) => {
-      attempts.push({ table, fields });
-    });
-  });
-  ['tasks_list', 'tasks'].forEach((table) => {
-    TASK_SELECT_VARIANTS_LEGACY.forEach((fields) => {
-      attempts.push({ table, fields });
+  const seenAttempts = new Set();
+  const pushAttempt = (table, fields) => {
+    const tableKey = String(table || '').trim();
+    const fieldKey = String(fields || '').trim();
+    if (!tableKey || !fieldKey) return;
+    const key = `${tableKey}::${fieldKey}`;
+    if (seenAttempts.has(key)) return;
+    seenAttempts.add(key);
+    attempts.push({ table: tableKey, fields: fieldKey });
+  };
+
+  const cachedAttempt = taskFetchStrategyRef.current;
+  if (cachedAttempt?.table && cachedAttempt?.fields) {
+    pushAttempt(cachedAttempt.table, cachedAttempt.fields);
+  }
+
+  const tableOrder =
+    cachedAttempt?.table === 'tasks_list' ? ['tasks_list', 'tasks'] : ['tasks', 'tasks_list'];
+  const variantGroups = [
+    TASK_SELECT_VARIANTS_WITH_DURATION_ARCHIVE_GROUP_CATEGORY,
+    TASK_SELECT_VARIANTS_WITH_DURATION_LEGACY_GROUP_CATEGORY,
+    TASK_SELECT_VARIANTS_WITH_DURATION_ARCHIVE_CATEGORY,
+    TASK_SELECT_VARIANTS_WITH_DURATION_LEGACY_CATEGORY,
+    TASK_SELECT_VARIANTS_WITH_ARCHIVE_GROUP_CATEGORY,
+    TASK_SELECT_VARIANTS_LEGACY_GROUP_CATEGORY,
+    TASK_SELECT_VARIANTS_WITH_ARCHIVE_CATEGORY,
+    TASK_SELECT_VARIANTS_LEGACY_CATEGORY,
+    TASK_SELECT_VARIANTS_WITH_DURATION_ARCHIVE_GROUP,
+    TASK_SELECT_VARIANTS_WITH_DURATION_LEGACY_GROUP,
+    TASK_SELECT_VARIANTS_WITH_DURATION_ARCHIVE,
+    TASK_SELECT_VARIANTS_WITH_DURATION_LEGACY,
+    TASK_SELECT_VARIANTS_WITH_ARCHIVE_GROUP,
+    TASK_SELECT_VARIANTS_LEGACY_GROUP,
+    TASK_SELECT_VARIANTS_WITH_ARCHIVE,
+    TASK_SELECT_VARIANTS_LEGACY,
+  ];
+
+  tableOrder.forEach((table) => {
+    variantGroups.forEach((variants) => {
+      variants.forEach((fields) => {
+        pushAttempt(table, fields);
+      });
     });
   });
 
   let data = null;
   let error = null;
+  let successfulAttempt = null;
   for (const attempt of attempts) {
     ({ data, error } = await buildQuery(attempt.table, attempt.fields));
     if (error) {
@@ -7551,16 +7674,21 @@ const fetchTasksFromSupabase = async (userId) => {
       }
       break;
     }
+    successfulAttempt = attempt;
     break;
   }
 
   if (error) {
+    taskFetchStrategyRef.current = null;
     if (isNetworkRequestFailedError(error)) {
       noteNetworkFailure('tasks', error);
     } else {
       console.log('Error fetching tasks:', error);
     }
-    return;
+    return false;
+  }
+  if (successfulAttempt) {
+    taskFetchStrategyRef.current = successfulAttempt;
   }
   noteNetworkSuccess();
 
@@ -7628,6 +7756,7 @@ const fetchTasksFromSupabase = async (userId) => {
   });
   setTasks(allTasks);
   setArchivedTasks([]);
+  return true;
 };
 
 
@@ -13346,6 +13475,11 @@ const mapProfileRow = (row) => {
     dataLoadTimestampsRef.current = {};
     friendDataPromiseRef.current = null;
     healthDataPromiseRef.current = null;
+    habitsDataPromiseRef.current = null;
+    tasksDataPromiseRef.current = null;
+    taskFetchStrategyRef.current = null;
+    habitsCacheReadyUserRef.current = null;
+    tasksCacheReadyUserRef.current = null;
     lastPresenceUpdateRef.current = 0;
 
     // Optional: keep a local copy (offline cache)
@@ -13534,6 +13668,11 @@ const mapProfileRow = (row) => {
     dataLoadTimestampsRef.current = {};
     friendDataPromiseRef.current = null;
     healthDataPromiseRef.current = null;
+    habitsDataPromiseRef.current = null;
+    tasksDataPromiseRef.current = null;
+    taskFetchStrategyRef.current = null;
+    habitsCacheReadyUserRef.current = null;
+    tasksCacheReadyUserRef.current = null;
     lastPresenceUpdateRef.current = 0;
     setAuthUser(null);
     mfaRefreshRequestRef.current += 1;

@@ -58,8 +58,6 @@ const HomeScreen = () => {
     deleteNote,
     streakFrozen,
     ensureHomeDataLoaded,
-    ensureFriendDataLoaded,
-    ensureTaskInvitesLoaded,
     ensureRoutinesLoaded,
     ensureHealthLoaded,
     healthData,
@@ -576,16 +574,12 @@ const HomeScreen = () => {
 
   React.useEffect(() => {
     ensureHomeDataLoaded();
-    ensureFriendDataLoaded();
-    ensureTaskInvitesLoaded();
     ensureRoutinesLoaded();
     ensureHealthLoaded();
   }, [
-    ensureFriendDataLoaded,
     ensureHomeDataLoaded,
     ensureHealthLoaded,
     ensureRoutinesLoaded,
-    ensureTaskInvitesLoaded,
   ]);
 
   const sortedNotes = React.useMemo(() => {
