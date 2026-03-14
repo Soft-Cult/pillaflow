@@ -12,8 +12,8 @@ import useWeightManagerOverview from '../hooks/useWeightManagerOverview';
 import {
   formatProgressDateLabel,
   getWeightProgressStorageKey,
+  mergeWeightProgressPayload,
   normalizePositiveWeight,
-  parseWeightProgressPayload,
 } from '../utils/weightProgress';
 
 const WeightManagerScreen = () => {
@@ -74,8 +74,32 @@ const WeightManagerScreen = () => {
     [isDark, themeColors]
   );
 
-  const targetLabel = weightManagerTargetBody?.label || 'Target';
-  const targetCalories = weightManagerPlan?.targetCalories;
+  const targetLabel = weightManagerPlan?.goalFocusLabel || weightManagerTargetBody?.label || 'Target';
+  const targetLabelHeading = weightManagerPlan?.goalFocusLabel ? 'Journey Focus' : 'Target Type';
+  const targetCalories = Number.isFinite(Number(weightManagerPlan?.targetCalories))
+    ? Math.round(Number(weightManagerPlan.targetCalories))
+    : Number.isFinite(Number(profile?.weightManagerTargetCalories)) &&
+      Number(profile?.weightManagerTargetCalories) > 0
+    ? Math.round(Number(profile.weightManagerTargetCalories))
+    : null;
+  const proteinGoal = Number.isFinite(Number(weightManagerPlan?.proteinGrams))
+    ? Math.round(Number(weightManagerPlan.proteinGrams))
+    : Number.isFinite(Number(profile?.weightManagerProteinGrams)) &&
+      Number(profile?.weightManagerProteinGrams) > 0
+    ? Math.round(Number(profile.weightManagerProteinGrams))
+    : null;
+  const carbsGoal = Number.isFinite(Number(weightManagerPlan?.carbsGrams))
+    ? Math.round(Number(weightManagerPlan.carbsGrams))
+    : Number.isFinite(Number(profile?.weightManagerCarbsGrams)) &&
+      Number(profile?.weightManagerCarbsGrams) > 0
+    ? Math.round(Number(profile.weightManagerCarbsGrams))
+    : null;
+  const fatGoal = Number.isFinite(Number(weightManagerPlan?.fatGrams))
+    ? Math.round(Number(weightManagerPlan.fatGrams))
+    : Number.isFinite(Number(profile?.weightManagerFatGrams)) &&
+      Number(profile?.weightManagerFatGrams) > 0
+    ? Math.round(Number(profile.weightManagerFatGrams))
+    : null;
 
   const startingValue = weightManagerStartingValue?.value;
   const currentValue = weightManagerCurrentValue?.value;
@@ -120,15 +144,12 @@ const WeightManagerScreen = () => {
   const hydrateProgressCheck = useCallback(async () => {
     try {
       const stored = await AsyncStorage.getItem(progressStorageKey);
-      if (!stored) {
-        setProgressStartInput('');
-        setProgressCurrentInput('');
-        setProgressEntries([]);
-        return;
-      }
-
-      const parsed = JSON.parse(stored);
-      const normalized = parseWeightProgressPayload(parsed);
+      const parsed = stored ? JSON.parse(stored) : null;
+      const normalized = mergeWeightProgressPayload({
+        payload: parsed,
+        logs: weightManagerLogs,
+        startingWeight: weightManagerStartingValue?.value,
+      });
       setProgressStartInput(
         Number.isFinite(normalized.startingWeight) ? String(normalized.startingWeight) : ''
       );
@@ -139,7 +160,7 @@ const WeightManagerScreen = () => {
     } catch (error) {
       console.log('Error loading weight progress check:', error);
     }
-  }, [progressStorageKey]);
+  }, [progressStorageKey, weightManagerLogs, weightManagerStartingValue?.value]);
 
   useEffect(() => {
     hydrateProgressCheck();
@@ -247,7 +268,7 @@ const WeightManagerScreen = () => {
           </View>
 
           <Text style={[styles.progressCheckIntro, { color: summaryTheme.muted }]}>
-            Track your weight trend without setting a goal or journey.
+            Keep your weight trend up to date to stay closer to your journey goals.
           </Text>
 
           <View style={[styles.progressCheckDiffCard, { backgroundColor: summaryTheme.softBorder }]}>
@@ -296,11 +317,13 @@ const WeightManagerScreen = () => {
         >
           <View style={styles.summaryHeader}>
             <View style={styles.summaryTargetType}>
-              <View style={styles.summaryIconBubble}>
-                <Ionicons name="body" size={18} color={summaryTheme.highlight} />
-              </View>
+                <View style={styles.summaryIconBubble}>
+                  <Ionicons name="body" size={18} color={summaryTheme.highlight} />
+                </View>
               <View>
-                <Text style={[styles.summaryLabel, { color: summaryTheme.muted }]}>Target Type</Text>
+                <Text style={[styles.summaryLabel, { color: summaryTheme.muted }]}>
+                  {targetLabelHeading}
+                </Text>
                 <Text style={[styles.summaryValue, { color: themeColors.text }]}>{targetLabel}</Text>
               </View>
             </View>
@@ -309,7 +332,7 @@ const WeightManagerScreen = () => {
               <Text style={[styles.summaryLabel, { color: summaryTheme.badgeText }]}>Daily Target</Text>
               <Text style={[styles.summaryValue, { color: summaryTheme.badgeText }]}
               >
-                {targetCalories || '--'}
+                {targetCalories ?? '--'}
               </Text>
               <Text style={[styles.summaryMeta, { color: summaryTheme.badgeText }]}>cal/day</Text>
             </View>
@@ -464,19 +487,19 @@ const WeightManagerScreen = () => {
             <View style={[styles.macroCard, { backgroundColor: summaryTheme.macro.protein }]}
             >
               <Ionicons name="fitness" size={20} color="#FFFFFF" />
-              <Text style={styles.macroValue}>{weightManagerPlan?.proteinGrams ?? '--'}g</Text>
+              <Text style={styles.macroValue}>{Number.isFinite(proteinGoal) ? `${proteinGoal}g` : '--'}</Text>
               <Text style={styles.macroLabel}>Protein</Text>
             </View>
             <View style={[styles.macroCard, { backgroundColor: summaryTheme.macro.carbs }]}
             >
               <Ionicons name="nutrition" size={20} color="#FFFFFF" />
-              <Text style={styles.macroValue}>{weightManagerPlan?.carbsGrams ?? '--'}g</Text>
+              <Text style={styles.macroValue}>{Number.isFinite(carbsGoal) ? `${carbsGoal}g` : '--'}</Text>
               <Text style={styles.macroLabel}>Carbs</Text>
             </View>
             <View style={[styles.macroCard, { backgroundColor: summaryTheme.macro.fat }]}
             >
               <Ionicons name="leaf" size={20} color="#FFFFFF" />
-              <Text style={styles.macroValue}>{weightManagerPlan?.fatGrams ?? '--'}g</Text>
+              <Text style={styles.macroValue}>{Number.isFinite(fatGoal) ? `${fatGoal}g` : '--'}</Text>
               <Text style={styles.macroLabel}>Fat</Text>
             </View>
           </View>

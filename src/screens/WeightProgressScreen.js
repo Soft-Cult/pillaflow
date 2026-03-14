@@ -18,21 +18,42 @@ import { useApp } from '../context/AppContext';
 import { PlatformScrollView } from '../components';
 import { borderRadius, spacing, typography, shadows } from '../utils/theme';
 import useWeightManagerOverview from '../hooks/useWeightManagerOverview';
+import { computeWeightManagerPlan } from '../utils/weightManager';
 import {
+  buildWeightProgressPayload,
+  DEFAULT_WEIGHT_PROGRESS_MAX_ENTRIES,
   formatProgressAxisDate,
   formatProgressDateLabel,
   formatProgressEntryDate,
   getWeightProgressStorageKey,
+  mergeWeightProgressPayload,
   normalizePositiveWeight,
-  parseWeightProgressPayload,
   toDateKey,
   withTodayProgressEntry,
 } from '../utils/weightProgress';
 
 const MAX_GRAPH_POINTS = 30;
-const MAX_STORED_ENTRIES = 60;
+const MAX_STORED_ENTRIES = DEFAULT_WEIGHT_PROGRESS_MAX_ENTRIES;
 const MAX_VISIBLE_ENTRIES = 25;
 const Y_AXIS_TICKS = 4;
+
+const formatRemainingTime = (days) => {
+  const parsedDays = Math.round(Number(days) || 0);
+  if (!Number.isFinite(parsedDays) || parsedDays <= 0) return 'Target reached';
+  if (parsedDays < 7) return `${parsedDays} day${parsedDays === 1 ? '' : 's'}`;
+  const weeks = Math.round(parsedDays / 7);
+  return `${weeks} week${weeks === 1 ? '' : 's'}`;
+};
+
+const formatTargetDate = (value) => {
+  const parsed = value ? new Date(`${value}T12:00:00`) : null;
+  if (!parsed || Number.isNaN(parsed.getTime())) return '--';
+  return parsed.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
 
 const buildXAxisTickIndices = (pointCount, maxLabels = 4) => {
   if (!Number.isFinite(pointCount) || pointCount <= 0) return [];
@@ -59,8 +80,14 @@ const WeightProgressScreen = () => {
     themeColors,
     themeName,
     profile,
+    weightManagerLogs,
   } = useApp();
-  const { weightManagerUnit } = useWeightManagerOverview();
+  const {
+    weightManagerUnit,
+    weightManagerPlan,
+    weightManagerState,
+    weightManagerIsActive,
+  } = useWeightManagerOverview();
   const styles = useMemo(() => createStyles(themeColors), [themeColors]);
 
   const isDark = themeName === 'dark';
@@ -103,16 +130,13 @@ const WeightProgressScreen = () => {
   const hydrateProgress = useCallback(async () => {
     try {
       const stored = await AsyncStorage.getItem(progressStorageKey);
-      if (!stored) {
-        setProgressStartInput('');
-        setProgressCurrentInput('');
-        setProgressEntries([]);
-        setProgressSavedMessage('');
-        return;
-      }
-
-      const parsed = JSON.parse(stored);
-      const normalized = parseWeightProgressPayload(parsed);
+      const parsed = stored ? JSON.parse(stored) : null;
+      const normalized = mergeWeightProgressPayload({
+        payload: parsed,
+        logs: weightManagerLogs,
+        startingWeight: weightManagerState?.startingWeight,
+        maxEntries: MAX_STORED_ENTRIES,
+      });
       setProgressStartInput(
         Number.isFinite(normalized.startingWeight) ? String(normalized.startingWeight) : ''
       );
@@ -124,7 +148,7 @@ const WeightProgressScreen = () => {
     } catch (error) {
       console.log('Error loading weight progress check:', error);
     }
-  }, [progressStorageKey]);
+  }, [progressStorageKey, weightManagerLogs, weightManagerState?.startingWeight]);
 
   useEffect(() => {
     hydrateProgress();
@@ -163,6 +187,74 @@ const WeightProgressScreen = () => {
     () => [...progressEntries].reverse().slice(0, MAX_VISIBLE_ENTRIES),
     [progressEntries]
   );
+  const projectedJourneyPlan = useMemo(() => {
+    if (!weightManagerIsActive || !weightManagerState) return null;
+
+    const journeyWeeks = Number(weightManagerState?.journeyDurationWeeks);
+    const journeyDurationDays =
+      weightManagerState?.journeyGoalMode === 'duration' &&
+      Number.isFinite(journeyWeeks) &&
+      journeyWeeks > 0
+        ? Math.round(journeyWeeks * 7)
+        : null;
+    const journeyEndDate =
+      weightManagerState?.journeyGoalMode === 'date' ? weightManagerState?.journeyGoalDate : null;
+    const storedCurrentWeight = Number(weightManagerState?.currentWeight);
+    const resolvedCurrentWeight = Number.isFinite(progressCurrentValue)
+      ? progressCurrentValue
+      : Number.isFinite(storedCurrentWeight) && storedCurrentWeight > 0
+      ? storedCurrentWeight
+      : null;
+
+    if (!Number.isFinite(resolvedCurrentWeight)) {
+      return weightManagerPlan || null;
+    }
+
+    return (
+      computeWeightManagerPlan({
+        startingWeight: weightManagerState?.startingWeight,
+        currentWeight: resolvedCurrentWeight,
+        targetWeight: weightManagerState?.targetWeight,
+        unit: weightManagerState?.weightUnit,
+        currentBodyTypeKey: weightManagerState?.currentBodyType,
+        targetBodyTypeKey: weightManagerState?.targetBodyType,
+        goalFocusKey: weightManagerState?.goalFocusKey,
+        activityLevelKey: weightManagerState?.activityLevelKey,
+        sex: weightManagerState?.sex,
+        ageYears: weightManagerState?.ageYears,
+        heightCm: weightManagerState?.heightCm,
+        journeyDurationDays,
+        journeyEndDate,
+      }) || weightManagerPlan
+    );
+  }, [
+    progressCurrentValue,
+    weightManagerIsActive,
+    weightManagerPlan,
+    weightManagerState,
+  ]);
+  const rawJourneyTargetWeight = Number(weightManagerState?.targetWeight);
+  const journeyTargetWeight =
+    Number.isFinite(rawJourneyTargetWeight) && rawJourneyTargetWeight > 0
+      ? rawJourneyTargetWeight
+      : null;
+  const journeyCountdownLabel = useMemo(() => {
+    if (!projectedJourneyPlan) return '';
+    if (Number.isFinite(progressCurrentValue) && Number.isFinite(journeyTargetWeight) && progressCurrentValue <= journeyTargetWeight) {
+      return 'Target reached';
+    }
+    return formatRemainingTime(projectedJourneyPlan?.estimatedDays);
+  }, [journeyTargetWeight, progressCurrentValue, projectedJourneyPlan]);
+  const journeyCountdownDetail = useMemo(() => {
+    if (!projectedJourneyPlan) return '';
+    if (journeyCountdownLabel === 'Target reached') {
+      return 'You are at or below your target from this plan. Keep logging your weight to hold the result.';
+    }
+    const targetText = Number.isFinite(journeyTargetWeight)
+      ? `${journeyTargetWeight} ${weightManagerUnit}`
+      : 'your target';
+    return `At your current pace, you are about ${journeyCountdownLabel.toLowerCase()} away from ${targetText} and projected to finish by ${formatTargetDate(projectedJourneyPlan.projectedEndDateISO)}.`;
+  }, [journeyCountdownLabel, journeyTargetWeight, projectedJourneyPlan, weightManagerUnit]);
 
   const graphPoints = useMemo(() => {
     const basePoints = [...progressEntries];
@@ -265,33 +357,44 @@ const WeightProgressScreen = () => {
       return;
     }
 
-    const nextEntries = withTodayProgressEntry({
-      entries: progressEntries,
-      weight: normalizedCurrent,
+    const nextPayload = buildWeightProgressPayload({
+      payload: {
+        startingWeight: normalizedStart,
+        currentWeight: normalizePositiveWeight(progressCurrentInput),
+        entries: progressEntries,
+      },
+      startingWeight: normalizedStart,
+      currentWeight: normalizedCurrent,
       maxEntries: MAX_STORED_ENTRIES,
     });
 
-    setProgressStartInput(String(normalizedStart));
-    setProgressCurrentInput(String(normalizedCurrent));
-    setProgressEntries(nextEntries);
-    setProgressSavedMessage('Progress check saved.');
+    setProgressStartInput(
+      Number.isFinite(nextPayload.startingWeight) ? String(nextPayload.startingWeight) : ''
+    );
+    setProgressCurrentInput(
+      Number.isFinite(nextPayload.currentWeight) ? String(nextPayload.currentWeight) : ''
+    );
+    setProgressEntries(nextPayload.entries);
+    setProgressSavedMessage(
+      weightManagerIsActive
+        ? 'Progress check saved. Your target countdown is updated below.'
+        : 'Progress check saved.'
+    );
     setShowProgressEditor(false);
 
     try {
-      await AsyncStorage.setItem(
-        progressStorageKey,
-        JSON.stringify({
-          startingWeight: normalizedStart,
-          currentWeight: normalizedCurrent,
-          entries: nextEntries,
-          updatedAt: new Date().toISOString(),
-        })
-      );
+      await AsyncStorage.setItem(progressStorageKey, JSON.stringify(nextPayload));
     } catch (error) {
       console.log('Error saving weight progress check:', error);
       Alert.alert('Unable to save progress check', 'Please try again.');
     }
-  }, [progressCurrentInput, progressEntries, progressStartInput, progressStorageKey]);
+  }, [
+    progressCurrentInput,
+    progressEntries,
+    progressStartInput,
+    progressStorageKey,
+    weightManagerIsActive,
+  ]);
 
   const performDeleteProgressEntry = useCallback(
     async (entryDateKey) => {
@@ -379,7 +482,9 @@ const WeightProgressScreen = () => {
               <Ionicons name={showProgressEditor ? 'close' : 'add'} size={20} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.heroSubtitle}>Track your weight trend over time.</Text>
+          <Text style={styles.heroSubtitle}>
+            Track your weight trend over time and keep your goal timeline on track.
+          </Text>
         </LinearGradient>
 
         <View style={[styles.sectionCard, { backgroundColor: progressTheme.card, borderColor: progressTheme.cardBorder }]}>
@@ -418,6 +523,26 @@ const WeightProgressScreen = () => {
               </Text>
             </View>
           </View>
+
+          {projectedJourneyPlan ? (
+            <View style={[styles.journeyCountdownCard, { backgroundColor: progressTheme.softBorder }]}>
+              <View style={styles.journeyCountdownHeader}>
+                <Ionicons name="flag-outline" size={16} color={progressTheme.highlight} />
+                <Text style={[styles.journeyCountdownTitle, { color: themeColors.text }]}>
+                  Time left to target
+                </Text>
+              </View>
+              <Text style={[styles.journeyCountdownValue, { color: themeColors.text }]}>
+                {journeyCountdownLabel}
+              </Text>
+              <Text style={[styles.journeyCountdownDetail, { color: progressTheme.muted }]}>
+                {journeyCountdownDetail}
+              </Text>
+              <Text style={[styles.journeyCountdownHint, { color: progressTheme.highlight }]}>
+                Keep your weight up to date here to stay closer to your goals.
+              </Text>
+            </View>
+          ) : null}
 
           {showProgressEditor ? (
             <View style={styles.editorPanel}>
@@ -697,6 +822,35 @@ const createStyles = (themeColors) =>
     },
     metricSummaryItem: {
       flex: 1,
+    },
+    journeyCountdownCard: {
+      marginTop: spacing.md,
+      borderRadius: borderRadius.lg,
+      padding: spacing.md,
+    },
+    journeyCountdownHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.xs,
+    },
+    journeyCountdownTitle: {
+      ...typography.bodySmall,
+      fontWeight: '700',
+      marginLeft: spacing.xs,
+    },
+    journeyCountdownValue: {
+      ...typography.h3,
+      marginTop: 2,
+    },
+    journeyCountdownDetail: {
+      ...typography.bodySmall,
+      marginTop: spacing.xs,
+      lineHeight: 20,
+    },
+    journeyCountdownHint: {
+      ...typography.caption,
+      fontWeight: '700',
+      marginTop: spacing.sm,
     },
     metricSummaryValue: {
       ...typography.body,

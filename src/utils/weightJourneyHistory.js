@@ -1,7 +1,20 @@
-import { computeWeightManagerPlan, DEFAULT_WEIGHT_MANAGER_BODY_TYPE, DEFAULT_WEIGHT_MANAGER_UNIT } from './weightManager';
+import {
+  computeWeightManagerPlan,
+  DEFAULT_WEIGHT_MANAGER_ACTIVITY_LEVEL,
+  DEFAULT_WEIGHT_MANAGER_BODY_TYPE,
+  DEFAULT_WEIGHT_MANAGER_GOAL,
+  DEFAULT_WEIGHT_MANAGER_UNIT,
+  normalizeWeightManagerActivityLevelKey,
+  normalizeWeightManagerBodyTypeKey,
+  normalizeWeightManagerGoalKey,
+  normalizeWeightManagerSex,
+} from './weightManager';
 
 const HISTORY_STORAGE_PREFIX = 'weight_manager_journey_history';
 const STATE_STORAGE_PREFIX = 'weight_manager_state';
+
+export const WEIGHT_MANAGER_PLAN_STATUS_DRAFT = 'draft';
+export const WEIGHT_MANAGER_PLAN_STATUS_ACTIVE = 'active';
 
 const normalizeWeightValue = (value) => {
   if (value === null || value === undefined || value === '') return null;
@@ -39,7 +52,10 @@ const normalizeUnit = (value) => (value === 'lb' ? 'lb' : DEFAULT_WEIGHT_MANAGER
 
 const normalizeGoalMode = (value) => (value === 'date' ? 'date' : 'duration');
 
-const normalizeStatus = (value) => (value === 'active' ? 'active' : 'completed');
+export const normalizeJourneyPlanStatus = (value) =>
+  value === WEIGHT_MANAGER_PLAN_STATUS_ACTIVE
+    ? WEIGHT_MANAGER_PLAN_STATUS_ACTIVE
+    : WEIGHT_MANAGER_PLAN_STATUS_DRAFT;
 
 const resolveUserId = ({ authUserId, profileId, profileUserId } = {}) =>
   authUserId || profileId || profileUserId || 'default';
@@ -67,7 +83,11 @@ export const getWeightManagerStateStorageKey = ({ authUserId, profileId, profile
   return `${STATE_STORAGE_PREFIX}:${userId}`;
 };
 
-export const getWeightJourneyHistoryStorageKey = ({ authUserId, profileId, profileUserId } = {}) => {
+export const getWeightJourneyHistoryStorageKey = ({
+  authUserId,
+  profileId,
+  profileUserId,
+} = {}) => {
   const userId = resolveUserId({ authUserId, profileId, profileUserId });
   return `${HISTORY_STORAGE_PREFIX}:${userId}`;
 };
@@ -76,6 +96,37 @@ export const hasJourneyState = (state = {}) => {
   const currentWeight = normalizeWeightValue(state?.currentWeight);
   const targetWeight = normalizeWeightValue(state?.targetWeight);
   return Number.isFinite(currentWeight) && Number.isFinite(targetWeight);
+};
+
+export const isJourneyPlanActive = (state = {}) =>
+  normalizeJourneyPlanStatus(state?.planStatus) === WEIGHT_MANAGER_PLAN_STATUS_ACTIVE &&
+  hasJourneyState(state);
+
+export const normalizeWeightManagerState = (state = {}, fallback = {}) => {
+  const merged = { ...(fallback || {}), ...(state || {}) };
+  const currentWeight = normalizeWeightValue(merged?.currentWeight);
+  const startingWeight =
+    normalizeWeightValue(merged?.startingWeight) ?? currentWeight ?? normalizeWeightValue(fallback?.startingWeight);
+
+  return {
+    weightUnit: normalizeUnit(merged?.weightUnit),
+    startingWeight,
+    currentWeight,
+    targetWeight: normalizeWeightValue(merged?.targetWeight),
+    currentBodyType: normalizeWeightManagerBodyTypeKey(merged?.currentBodyType),
+    targetBodyType: normalizeWeightManagerBodyTypeKey(merged?.targetBodyType),
+    goalFocusKey: normalizeWeightManagerGoalKey(merged?.goalFocusKey),
+    activityLevelKey: normalizeWeightManagerActivityLevelKey(merged?.activityLevelKey),
+    sex: normalizeWeightManagerSex(merged?.sex),
+    ageYears: toFiniteOrNull(merged?.ageYears),
+    heightCm: toFiniteOrNull(merged?.heightCm),
+    journeyGoalMode: normalizeGoalMode(merged?.journeyGoalMode),
+    journeyDurationWeeks: toFiniteOrNull(merged?.journeyDurationWeeks),
+    journeyGoalDate: normalizeDateKey(merged?.journeyGoalDate),
+    planStatus: normalizeJourneyPlanStatus(merged?.planStatus),
+    savedAt: toIsoTimestamp(merged?.savedAt || fallback?.savedAt || new Date()),
+    activatedAt: merged?.activatedAt ? toIsoTimestamp(merged.activatedAt) : null,
+  };
 };
 
 export const normalizeJourneyEntry = (entry = {}) => {
@@ -87,7 +138,10 @@ export const normalizeJourneyEntry = (entry = {}) => {
 
   return {
     id,
-    status: normalizeStatus(entry?.status),
+    status:
+      normalizeJourneyPlanStatus(entry?.status) === WEIGHT_MANAGER_PLAN_STATUS_ACTIVE
+        ? WEIGHT_MANAGER_PLAN_STATUS_ACTIVE
+        : 'completed',
     completedReason: entry?.completedReason || null,
     createdAt,
     completedAt,
@@ -95,8 +149,13 @@ export const normalizeJourneyEntry = (entry = {}) => {
     startingWeight: normalizeWeightValue(entry?.startingWeight),
     currentWeight: normalizeWeightValue(entry?.currentWeight),
     targetWeight: normalizeWeightValue(entry?.targetWeight),
-    currentBodyType: entry?.currentBodyType || DEFAULT_WEIGHT_MANAGER_BODY_TYPE,
-    targetBodyType: entry?.targetBodyType || DEFAULT_WEIGHT_MANAGER_BODY_TYPE,
+    currentBodyType: normalizeWeightManagerBodyTypeKey(entry?.currentBodyType),
+    targetBodyType: normalizeWeightManagerBodyTypeKey(entry?.targetBodyType),
+    goalFocusKey: normalizeWeightManagerGoalKey(entry?.goalFocusKey),
+    activityLevelKey: normalizeWeightManagerActivityLevelKey(entry?.activityLevelKey),
+    sex: normalizeWeightManagerSex(entry?.sex),
+    ageYears: toFiniteOrNull(entry?.ageYears),
+    heightCm: toFiniteOrNull(entry?.heightCm),
     journeyGoalMode: normalizeGoalMode(entry?.journeyGoalMode),
     journeyDurationWeeks: normalizeNumber(entry?.journeyDurationWeeks),
     journeyGoalDate: normalizeDateKey(entry?.journeyGoalDate),
@@ -142,47 +201,62 @@ export const appendJourneyHistoryEntry = (entries = [], nextEntry) =>
   normalizeJourneyHistoryEntries([...(Array.isArray(entries) ? entries : []), nextEntry]);
 
 const buildPlanForState = (state = {}) => {
-  if (!hasJourneyState(state)) return null;
-  const journeyWeeks = normalizeNumber(state?.journeyDurationWeeks);
+  const normalizedState = normalizeWeightManagerState(state);
+  if (!hasJourneyState(normalizedState)) return null;
+  const journeyWeeks = normalizeNumber(normalizedState?.journeyDurationWeeks);
   const journeyDurationDays =
-    normalizeGoalMode(state?.journeyGoalMode) === 'duration' && Number.isFinite(journeyWeeks)
+    normalizeGoalMode(normalizedState?.journeyGoalMode) === 'duration' &&
+    Number.isFinite(journeyWeeks)
       ? Math.max(1, Math.round(journeyWeeks * 7))
       : null;
   const journeyEndDate =
-    normalizeGoalMode(state?.journeyGoalMode) === 'date'
-      ? normalizeDateKey(state?.journeyGoalDate)
+    normalizeGoalMode(normalizedState?.journeyGoalMode) === 'date'
+      ? normalizeDateKey(normalizedState?.journeyGoalDate)
       : '';
   return computeWeightManagerPlan({
-    startingWeight: state?.startingWeight,
-    currentWeight: state?.currentWeight,
-    targetWeight: state?.targetWeight,
-    unit: normalizeUnit(state?.weightUnit),
-    currentBodyTypeKey: state?.currentBodyType || DEFAULT_WEIGHT_MANAGER_BODY_TYPE,
-    targetBodyTypeKey: state?.targetBodyType || DEFAULT_WEIGHT_MANAGER_BODY_TYPE,
+    startingWeight: normalizedState?.startingWeight,
+    currentWeight: normalizedState?.currentWeight,
+    targetWeight: normalizedState?.targetWeight,
+    unit: normalizedState?.weightUnit,
+    currentBodyTypeKey: normalizedState?.currentBodyType || DEFAULT_WEIGHT_MANAGER_BODY_TYPE,
+    targetBodyTypeKey: normalizedState?.targetBodyType || DEFAULT_WEIGHT_MANAGER_BODY_TYPE,
+    goalFocusKey: normalizedState?.goalFocusKey || DEFAULT_WEIGHT_MANAGER_GOAL,
+    activityLevelKey:
+      normalizedState?.activityLevelKey || DEFAULT_WEIGHT_MANAGER_ACTIVITY_LEVEL,
+    sex: normalizedState?.sex,
+    ageYears: normalizedState?.ageYears,
+    heightCm: normalizedState?.heightCm,
     journeyDurationDays,
     journeyEndDate: journeyEndDate || null,
   });
 };
 
 const buildBaseJourneyEntry = ({ id, status, state = {}, plan = null, createdAt = null }) => {
-  const resolvedPlan = plan || buildPlanForState(state);
-  const normalizedGoalMode = normalizeGoalMode(state?.journeyGoalMode);
+  const normalizedState = normalizeWeightManagerState(state);
+  const resolvedPlan = plan || buildPlanForState(normalizedState);
+  const normalizedGoalMode = normalizeGoalMode(normalizedState?.journeyGoalMode);
 
   return {
     id,
     status,
     createdAt: toIsoTimestamp(createdAt || new Date()),
-    unit: normalizeUnit(state?.weightUnit),
-    startingWeight: normalizeWeightValue(state?.startingWeight),
-    currentWeight: normalizeWeightValue(state?.currentWeight),
-    targetWeight: normalizeWeightValue(state?.targetWeight),
-    currentBodyType: state?.currentBodyType || DEFAULT_WEIGHT_MANAGER_BODY_TYPE,
-    targetBodyType: state?.targetBodyType || DEFAULT_WEIGHT_MANAGER_BODY_TYPE,
+    unit: normalizedState?.weightUnit,
+    startingWeight: normalizeWeightValue(normalizedState?.startingWeight),
+    currentWeight: normalizeWeightValue(normalizedState?.currentWeight),
+    targetWeight: normalizeWeightValue(normalizedState?.targetWeight),
+    currentBodyType: normalizedState?.currentBodyType || DEFAULT_WEIGHT_MANAGER_BODY_TYPE,
+    targetBodyType: normalizedState?.targetBodyType || DEFAULT_WEIGHT_MANAGER_BODY_TYPE,
+    goalFocusKey: normalizedState?.goalFocusKey || DEFAULT_WEIGHT_MANAGER_GOAL,
+    activityLevelKey:
+      normalizedState?.activityLevelKey || DEFAULT_WEIGHT_MANAGER_ACTIVITY_LEVEL,
+    sex: normalizedState?.sex,
+    ageYears: normalizedState?.ageYears,
+    heightCm: normalizedState?.heightCm,
     journeyGoalMode: normalizedGoalMode,
     journeyDurationWeeks:
-      normalizedGoalMode === 'duration' ? normalizeNumber(state?.journeyDurationWeeks) : null,
+      normalizedGoalMode === 'duration' ? normalizeNumber(normalizedState?.journeyDurationWeeks) : null,
     journeyGoalDate:
-      normalizedGoalMode === 'date' ? normalizeDateKey(state?.journeyGoalDate) : '',
+      normalizedGoalMode === 'date' ? normalizeDateKey(normalizedState?.journeyGoalDate) : '',
     timelineTargetDays: toFiniteOrNull(resolvedPlan?.timelineTargetDays),
     estimatedDays: toFiniteOrNull(resolvedPlan?.estimatedDays),
     projectedEndDateISO: normalizeDateKey(resolvedPlan?.projectedEndDateISO),
@@ -199,13 +273,16 @@ const buildBaseJourneyEntry = ({ id, status, state = {}, plan = null, createdAt 
 };
 
 export const buildCurrentJourneyEntry = ({ state = {}, plan = null, logs = [] } = {}) => {
-  if (!hasJourneyState(state)) return null;
-  const createdAt = toIsoTimestamp(state?.savedAt || new Date());
+  const normalizedState = normalizeWeightManagerState(state);
+  if (!isJourneyPlanActive(normalizedState)) return null;
+  const createdAt = toIsoTimestamp(
+    normalizedState?.activatedAt || normalizedState?.savedAt || new Date()
+  );
   return normalizeJourneyEntry({
     ...buildBaseJourneyEntry({
       id: 'current-journey',
-      status: 'active',
-      state,
+      status: WEIGHT_MANAGER_PLAN_STATUS_ACTIVE,
+      state: normalizedState,
       plan,
       createdAt,
     }),
@@ -220,16 +297,18 @@ export const createCompletedJourneyEntry = ({
   completedAt = new Date(),
   completedReason = 'goal_achieved',
 } = {}) => {
-  if (!hasJourneyState(state)) return null;
+  const normalizedState = normalizeWeightManagerState(state);
+  if (!hasJourneyState(normalizedState)) return null;
   const completionTimestamp = toIsoTimestamp(completedAt);
   const id = `journey-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
   return normalizeJourneyEntry({
     ...buildBaseJourneyEntry({
       id,
       status: 'completed',
-      state,
+      state: normalizedState,
       plan,
-      createdAt: state?.savedAt || completionTimestamp,
+      createdAt:
+        normalizedState?.activatedAt || normalizedState?.savedAt || completionTimestamp,
     }),
     completedAt: completionTimestamp,
     completedReason,

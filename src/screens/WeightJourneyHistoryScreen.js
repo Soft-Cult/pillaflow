@@ -8,8 +8,6 @@ import { useApp } from '../context/AppContext';
 import { Card, PlatformScrollView } from '../components';
 import { borderRadius, spacing, typography, shadows } from '../utils/theme';
 import {
-  computeWeightManagerPlan,
-  DEFAULT_WEIGHT_MANAGER_BODY_TYPE,
   DEFAULT_WEIGHT_MANAGER_UNIT,
   WEIGHT_MANAGER_BODY_TYPE_MAP,
 } from '../utils/weightManager';
@@ -17,8 +15,10 @@ import {
   buildCurrentJourneyEntry,
   getWeightJourneyHistoryStorageKey,
   getWeightManagerStateStorageKey,
-  hasJourneyState,
+  isJourneyPlanActive,
+  normalizeWeightManagerState,
   parseWeightJourneyHistoryPayload,
+  WEIGHT_MANAGER_PLAN_STATUS_ACTIVE,
 } from '../utils/weightJourneyHistory';
 
 const formatDateLabel = (value) => {
@@ -87,34 +87,13 @@ const WeightJourneyHistoryScreen = () => {
       const stateRaw = await AsyncStorage.getItem(stateStorageKey);
       if (stateRaw) {
         try {
-          const parsedState = JSON.parse(stateRaw);
-          if (hasJourneyState(parsedState)) {
-            const parsedWeeks = Number(parsedState?.journeyDurationWeeks);
-            const journeyDurationDays =
-              parsedState?.journeyGoalMode === 'duration' &&
-              Number.isFinite(parsedWeeks) &&
-              parsedWeeks > 0
-                ? Math.round(parsedWeeks * 7)
-                : null;
-            const journeyGoalDate =
-              parsedState?.journeyGoalMode === 'date' ? parsedState?.journeyGoalDate : null;
-
-            const activePlan = computeWeightManagerPlan({
-              startingWeight: parsedState?.startingWeight,
-              currentWeight: parsedState?.currentWeight,
-              targetWeight: parsedState?.targetWeight,
-              unit: parsedState?.weightUnit || DEFAULT_WEIGHT_MANAGER_UNIT,
-              currentBodyTypeKey:
-                parsedState?.currentBodyType || DEFAULT_WEIGHT_MANAGER_BODY_TYPE,
-              targetBodyTypeKey:
-                parsedState?.targetBodyType || DEFAULT_WEIGHT_MANAGER_BODY_TYPE,
-              journeyDurationDays,
-              journeyEndDate: journeyGoalDate,
-            });
-
+          const parsedState = normalizeWeightManagerState(JSON.parse(stateRaw));
+          if (isJourneyPlanActive(parsedState) || Number(profile?.weightManagerTargetCalories) > 0) {
             nextActiveJourney = buildCurrentJourneyEntry({
-              state: parsedState,
-              plan: activePlan,
+              state: {
+                ...parsedState,
+                planStatus: WEIGHT_MANAGER_PLAN_STATUS_ACTIVE,
+              },
               logs: weightManagerLogs,
             });
           }
@@ -132,7 +111,13 @@ const WeightJourneyHistoryScreen = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [ensureWeightManagerLogsLoaded, historyStorageKey, stateStorageKey, weightManagerLogs]);
+  }, [
+    ensureWeightManagerLogsLoaded,
+    historyStorageKey,
+    profile?.weightManagerTargetCalories,
+    stateStorageKey,
+    weightManagerLogs,
+  ]);
 
   useFocusEffect(
     useCallback(() => {

@@ -6,7 +6,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../context/AppContext';
 import { Card, PlatformScrollView } from '../components';
 import { borderRadius, spacing, typography, shadows } from '../utils/theme';
-import { DEFAULT_WEIGHT_MANAGER_UNIT, WEIGHT_MANAGER_BODY_TYPE_MAP } from '../utils/weightManager';
+import {
+  DEFAULT_WEIGHT_MANAGER_UNIT,
+  WEIGHT_MANAGER_ACTIVITY_LEVEL_MAP,
+  WEIGHT_MANAGER_BODY_TYPE_MAP,
+  WEIGHT_MANAGER_GOAL_MAP,
+} from '../utils/weightManager';
 
 const parseDateValue = (value) => {
   if (!value) return null;
@@ -71,6 +76,10 @@ const WeightJourneyHistoryDetailScreen = () => {
     WEIGHT_MANAGER_BODY_TYPE_MAP[journey?.currentBodyType]?.label || 'Current';
   const targetBodyLabel =
     WEIGHT_MANAGER_BODY_TYPE_MAP[journey?.targetBodyType]?.label || 'Target';
+  const goalFocusLabel =
+    WEIGHT_MANAGER_GOAL_MAP[journey?.goalFocusKey]?.label || '--';
+  const activityLevelLabel =
+    WEIGHT_MANAGER_ACTIVITY_LEVEL_MAP[journey?.activityLevelKey]?.label || '--';
 
   const timelineLabel =
     journey?.journeyGoalMode === 'date'
@@ -192,6 +201,36 @@ const WeightJourneyHistoryDetailScreen = () => {
                       ? 'Yes'
                       : 'No'
                     : '--'}
+                </Text>
+              </View>
+            </Card>
+
+            <Card style={styles.card}>
+              <Text style={styles.cardTitle}>Plan Profile</Text>
+              <View style={styles.metricRow}>
+                <Text style={styles.metricLabel}>Journey focus</Text>
+                <Text style={styles.metricValue}>{goalFocusLabel}</Text>
+              </View>
+              <View style={styles.metricRow}>
+                <Text style={styles.metricLabel}>Activity level</Text>
+                <Text style={styles.metricValue}>{activityLevelLabel}</Text>
+              </View>
+              <View style={styles.metricRow}>
+                <Text style={styles.metricLabel}>Gender</Text>
+                <Text style={styles.metricValue}>
+                  {journey?.sex ? String(journey.sex).replace(/^./, (char) => char.toUpperCase()) : '--'}
+                </Text>
+              </View>
+              <View style={styles.metricRow}>
+                <Text style={styles.metricLabel}>Age</Text>
+                <Text style={styles.metricValue}>
+                  {Number.isFinite(Number(journey?.ageYears)) ? `${Math.round(Number(journey.ageYears))}` : '--'}
+                </Text>
+              </View>
+              <View style={[styles.metricRow, styles.metricRowLast]}>
+                <Text style={styles.metricLabel}>Height</Text>
+                <Text style={styles.metricValue}>
+                  {Number.isFinite(Number(journey?.heightCm)) ? `${Math.round(Number(journey.heightCm))} cm` : '--'}
                 </Text>
               </View>
             </Card>
@@ -363,6 +402,9 @@ const createStyles = (themeColors) =>
       paddingVertical: spacing.sm,
       borderBottomWidth: 1,
       borderBottomColor: themeColors.border,
+    },
+    metricRowLast: {
+      borderBottomWidth: 0,
     },
     metricLabel: {
       ...typography.caption,

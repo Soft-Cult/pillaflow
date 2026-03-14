@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, useWindowDimensions, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, useWindowDimensions, TextInput, Modal as RNModal } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -74,6 +75,7 @@ const HealthScreen = () => {
   const route = useRoute();
   const { width: windowWidth } = useWindowDimensions();
   const {
+    authUser,
     healthData,
     waterLogs,
     addFoodEntryForDate,
@@ -243,6 +245,7 @@ const HealthScreen = () => {
   const restoreFoodModalRef = useRef(false);
   const restoreFoodModalFromSearchRef = useRef(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showJourneyTargetPrompt, setShowJourneyTargetPrompt] = useState(false);
 
   const moodOptions = MOOD_OPTIONS;
 
@@ -259,6 +262,13 @@ const HealthScreen = () => {
   };
 
   const handleSaveNutritionGoals = async () => {
+    if (weightManagerIsActive) {
+      Alert.alert(
+        'Goals locked',
+        'Your active weight loss journey controls daily calorie and macro goals until the journey is completed or reset.'
+      );
+      return;
+    }
     const caloriesGoal = parseGoalValue(calorieGoalInput, false);
     if (Number.isNaN(caloriesGoal)) {
       Alert.alert('Enter calories', 'Please enter a positive number.');
@@ -301,6 +311,13 @@ const HealthScreen = () => {
   };
 
   const handleClearNutritionGoals = async () => {
+    if (weightManagerIsActive) {
+      Alert.alert(
+        'Goals locked',
+        'Your active weight loss journey controls daily calorie and macro goals until the journey is completed or reset.'
+      );
+      return;
+    }
     try {
       setIsSavingGoals(true);
       await updateHealthForDate(selectedDateISO, {
@@ -599,6 +616,7 @@ const HealthScreen = () => {
 
   const selectedDateISO = selectedDate.toISOString().slice(0, 10);
   const selectedDateKey = selectedDateISO;
+  const todayDateISO = toLocalDateKey(new Date());
   const selectedHealthMetric = healthDailyMetrics?.[selectedDateKey] || null;
   const selectedStepsTotal = Math.max(
     0,
@@ -770,6 +788,7 @@ const HealthScreen = () => {
     weightManagerStartingDisplay,
     weightManagerCurrentDisplay,
     weightManagerTargetDisplay,
+    weightManagerIsActive,
   } = useWeightManagerOverview();
   const macroTotals = {
     protein: Number.isFinite(selectedNutritionTotals?.protein)
@@ -801,6 +820,12 @@ const HealthScreen = () => {
     fat: macroGoals.fat !== null ? Math.max(macroGoals.fat - macroTotals.fat, 0) : null,
   };
   const hasMacroGoals = Object.values(macroGoals).some((value) => value !== null);
+  const hasReachedJourneyTargets =
+    weightManagerIsActive &&
+    selectedDateISO === todayDateISO &&
+    dailyCalorieGoal > 0 &&
+    caloriesConsumed >= dailyCalorieGoal &&
+    Object.entries(macroGoals).every(([key, goal]) => goal === null || macroTotals[key] >= goal);
   const remainingRatio = dailyCalorieGoal
     ? Math.max(0, caloriesRemaining) / dailyCalorieGoal
     : 1;
@@ -823,6 +848,42 @@ const HealthScreen = () => {
 
   const activeMoodIndex =
     typeof selectedMoodIndex === 'number' ? selectedMoodIndex : currentMoodIndex();
+
+  useEffect(() => {
+    let cancelled = false;
+    const syncJourneyTargetPrompt = async () => {
+      if (!hasReachedJourneyTargets) return;
+      const promptKey = [
+        'health-journey-target',
+        selectedDateISO,
+        dailyCalorieGoal,
+        macroGoals.protein ?? 'na',
+        macroGoals.carbs ?? 'na',
+        macroGoals.fat ?? 'na',
+      ].join(':');
+      const storageKey = `${promptKey}:${authUser?.id || 'anon'}`;
+      const alreadyShown = await AsyncStorage.getItem(storageKey);
+      if (cancelled || alreadyShown) return;
+      await AsyncStorage.setItem(storageKey, 'shown');
+      if (!cancelled) setShowJourneyTargetPrompt(true);
+    };
+
+    syncJourneyTargetPrompt().catch((err) => {
+      console.log('Error showing journey target prompt:', err);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    authUser?.id,
+    dailyCalorieGoal,
+    hasReachedJourneyTargets,
+    macroGoals.carbs,
+    macroGoals.fat,
+    macroGoals.protein,
+    selectedDateISO,
+  ]);
 
   const moodEntries = useMemo(() => {
     const entries = [];
@@ -2112,6 +2173,11 @@ const HealthScreen = () => {
           <Text style={[styles.goalSectionSubtitle, { color: themeColors.textSecondary }]}>
             Customize your calories and macros for this day.
           </Text>
+          {weightManagerIsActive ? (
+            <Text style={[styles.goalSectionSubtitle, styles.journeyLockText, { color: themeColors.primary }]}>
+              Active weight loss journey targets are applied automatically while your journey is active.
+            </Text>
+          ) : null}
           <Input
             label="Calories (cal)"
             value={calorieGoalInput}
@@ -2119,6 +2185,7 @@ const HealthScreen = () => {
             placeholder={`${defaultCalorieGoal}`}
             keyboardType="numeric"
             containerStyle={styles.goalModalInput}
+            disabled={weightManagerIsActive}
           />
           <Input
             label="Protein (g)"
@@ -2127,6 +2194,7 @@ const HealthScreen = () => {
             placeholder="e.g., 120"
             keyboardType="decimal-pad"
             containerStyle={styles.goalModalInput}
+            disabled={weightManagerIsActive}
           />
           <Input
             label="Carbs (g)"
@@ -2135,6 +2203,7 @@ const HealthScreen = () => {
             placeholder="e.g., 200"
             keyboardType="decimal-pad"
             containerStyle={styles.goalModalInput}
+            disabled={weightManagerIsActive}
           />
           <Input
             label="Fat (g)"
@@ -2143,6 +2212,7 @@ const HealthScreen = () => {
             placeholder="e.g., 60"
             keyboardType="decimal-pad"
             containerStyle={styles.goalModalInput}
+            disabled={weightManagerIsActive}
           />
           <View style={styles.modalButtons}>
             <Button
@@ -2155,13 +2225,13 @@ const HealthScreen = () => {
             <Button
               title="Save Goals"
               onPress={handleSaveNutritionGoals}
-              disabled={isSavingGoals}
+              disabled={isSavingGoals || weightManagerIsActive}
               style={styles.modalButton}
             />
           </View>
           <TouchableOpacity
             onPress={handleClearNutritionGoals}
-            disabled={isSavingGoals}
+            disabled={isSavingGoals || weightManagerIsActive}
             style={styles.goalClearButton}
           >
             <Text style={[styles.goalClearText, { color: themeColors.textSecondary }]}>
@@ -2170,6 +2240,43 @@ const HealthScreen = () => {
           </TouchableOpacity>
         </View>
       </Modal>
+
+      <RNModal
+        visible={showJourneyTargetPrompt}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowJourneyTargetPrompt(false)}
+      >
+        <View style={styles.completionPromptOverlay}>
+          <View
+            style={[
+              styles.completionPromptCard,
+              {
+                backgroundColor: themeColors.card,
+                borderColor: themeColors.border,
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={healthTheme.calorie.buttonGradient}
+              style={styles.completionPromptIcon}
+            >
+              <Ionicons name="checkmark" size={22} color="#FFFFFF" />
+            </LinearGradient>
+            <Text style={[styles.completionPromptTitle, { color: themeColors.text }]}>
+              Well done your daily target is reached
+            </Text>
+            <Text style={[styles.completionPromptText, { color: themeColors.textSecondary }]}>
+              You have hit today&apos;s calorie and macro targets for your active journey plan.
+            </Text>
+            <Button
+              title="Close"
+              onPress={() => setShowJourneyTargetPrompt(false)}
+              style={styles.completionPromptButton}
+            />
+          </View>
+        </View>
+      </RNModal>
 
       {/* Add Meal Modal */}
       <Modal
@@ -3126,6 +3233,9 @@ const createStyles = (themeColors) => StyleSheet.create({
     marginTop: spacing.xs,
     marginBottom: spacing.md,
   },
+  journeyLockText: {
+    marginTop: 0,
+  },
   goalSectionMeta: {
     ...typography.caption,
     textTransform: 'uppercase',
@@ -3265,6 +3375,43 @@ const createStyles = (themeColors) => StyleSheet.create({
   },
   goalClearText: {
     ...typography.caption,
+  },
+  completionPromptOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.28)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  completionPromptCard: {
+    width: '100%',
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    padding: spacing.xl,
+    alignItems: 'center',
+    ...shadows.medium,
+  },
+  completionPromptIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  completionPromptTitle: {
+    ...typography.h3,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  completionPromptText: {
+    ...typography.bodySmall,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: spacing.lg,
+  },
+  completionPromptButton: {
+    alignSelf: 'stretch',
   },
   calorieLeft: {
     flex: 1,

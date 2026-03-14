@@ -1,4 +1,5 @@
 const DAY_MS = 24 * 60 * 60 * 1000;
+export const DEFAULT_WEIGHT_PROGRESS_MAX_ENTRIES = 60;
 
 export const getWeightProgressStorageKey = ({
   authUserId,
@@ -76,7 +77,7 @@ export const formatProgressEntryDate = (dateKey = '') => {
 export const withTodayProgressEntry = ({
   entries = [],
   weight,
-  maxEntries = 60,
+  maxEntries = DEFAULT_WEIGHT_PROGRESS_MAX_ENTRIES,
   date = new Date(),
 } = {}) => {
   const dateKey = toDateKey(date);
@@ -92,6 +93,83 @@ export const withTodayProgressEntry = ({
     return nextEntries;
   }
   return nextEntries.slice(nextEntries.length - maxEntries);
+};
+
+export const buildWeightProgressPayload = ({
+  payload,
+  startingWeight,
+  currentWeight,
+  maxEntries = DEFAULT_WEIGHT_PROGRESS_MAX_ENTRIES,
+  date = new Date(),
+} = {}) => {
+  const normalizedPayload = parseWeightProgressPayload(payload);
+  const normalizedCurrentWeight = normalizePositiveWeight(currentWeight);
+  const normalizedStartingWeight =
+    normalizePositiveWeight(startingWeight) ??
+    normalizedPayload.startingWeight ??
+    normalizedCurrentWeight;
+
+  const nextEntries = Number.isFinite(normalizedCurrentWeight)
+    ? withTodayProgressEntry({
+        entries: normalizedPayload.entries,
+        weight: normalizedCurrentWeight,
+        maxEntries,
+        date,
+      })
+    : normalizedPayload.entries;
+
+  const updatedAt =
+    date instanceof Date && !Number.isNaN(date.getTime())
+      ? date.toISOString()
+      : new Date().toISOString();
+
+  return {
+    startingWeight: normalizedStartingWeight,
+    currentWeight: normalizedCurrentWeight ?? normalizedPayload.currentWeight,
+    entries: nextEntries,
+    updatedAt,
+  };
+};
+
+export const mergeWeightProgressPayload = ({
+  payload,
+  logs = [],
+  startingWeight = null,
+  currentWeight = null,
+  maxEntries = DEFAULT_WEIGHT_PROGRESS_MAX_ENTRIES,
+} = {}) => {
+  const normalizedPayload = parseWeightProgressPayload(payload);
+  const logEntries = normalizeProgressEntries(
+    (Array.isArray(logs) ? logs : []).map((entry) => ({
+      dateKey: entry?.dateKey || entry?.logDate || entry?.date || entry?.loggedAt,
+      weight: entry?.weight,
+    }))
+  );
+  const mergedEntries = normalizeProgressEntries([
+    ...normalizedPayload.entries,
+    ...logEntries,
+  ]);
+  const trimmedEntries =
+    Number.isFinite(maxEntries) && maxEntries > 0 && mergedEntries.length > maxEntries
+      ? mergedEntries.slice(mergedEntries.length - maxEntries)
+      : mergedEntries;
+  const latestEntry = trimmedEntries.length ? trimmedEntries[trimmedEntries.length - 1] : null;
+  const earliestEntry = trimmedEntries.length ? trimmedEntries[0] : null;
+  const resolvedCurrentWeight =
+    normalizePositiveWeight(currentWeight) ??
+    normalizedPayload.currentWeight ??
+    normalizePositiveWeight(latestEntry?.weight);
+  const resolvedStartingWeight =
+    normalizePositiveWeight(startingWeight) ??
+    normalizedPayload.startingWeight ??
+    normalizePositiveWeight(earliestEntry?.weight) ??
+    resolvedCurrentWeight;
+
+  return {
+    startingWeight: resolvedStartingWeight,
+    currentWeight: resolvedCurrentWeight,
+    entries: trimmedEntries,
+  };
 };
 
 export const toUtcDayNumberFromDateKey = (dateKey = '') => {

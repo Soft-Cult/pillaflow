@@ -58,6 +58,7 @@ import {
   computeAchievementMetrics,
   computeEarnedAchievementBadges,
 } from '../utils/achievements';
+import { normalizeWeightManagerBodyTypeKey } from '../utils/weightManager';
 
 const AppContext = createContext();
 
@@ -223,6 +224,17 @@ const toRoundedPositiveIntOrNull = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : null;
 };
+
+const toStoredWeightManagerBodyType = (value) => {
+  const normalized = normalizeWeightManagerBodyTypeKey(value);
+  if (normalized === 'slim') return 'lean';
+  if (normalized === 'athletic') return 'muscular';
+  if (normalized === 'sturdy') return 'bulky';
+  return value || defaultProfile.weightManagerCurrentBodyType;
+};
+
+const fromStoredWeightManagerBodyType = (value, fallback = defaultProfile.weightManagerCurrentBodyType) =>
+  normalizeWeightManagerBodyTypeKey(value || fallback);
 
 const getActiveJourneyNutritionGoals = (profileValue = null) => ({
   calorieGoal: toPositiveGoalOrNull(profileValue?.weightManagerTargetCalories),
@@ -12390,10 +12402,14 @@ const mapProfileRow = (row) => {
       row?.weight_manager_target_weight,
       defaultProfile.weightManagerTargetWeight
     ),
-    weightManagerCurrentBodyType:
-      row?.weight_manager_current_body_type ?? defaultProfile.weightManagerCurrentBodyType,
-    weightManagerTargetBodyType:
-      row?.weight_manager_target_body_type ?? defaultProfile.weightManagerTargetBodyType,
+    weightManagerCurrentBodyType: fromStoredWeightManagerBodyType(
+      row?.weight_manager_current_body_type,
+      defaultProfile.weightManagerCurrentBodyType
+    ),
+    weightManagerTargetBodyType: fromStoredWeightManagerBodyType(
+      row?.weight_manager_target_body_type,
+      defaultProfile.weightManagerTargetBodyType
+    ),
     weightManagerTargetCalories,
     weightManagerProteinGrams: asNumber(
       row?.weight_manager_protein_grams,
@@ -12679,13 +12695,17 @@ const mapProfileRow = (row) => {
         fields.weightManagerTargetWeight ??
         profile.weightManagerTargetWeight,
       weight_manager_current_body_type:
-        fields.weight_manager_current_body_type ??
-        fields.weightManagerCurrentBodyType ??
-        profile.weightManagerCurrentBodyType,
+        toStoredWeightManagerBodyType(
+          fields.weight_manager_current_body_type ??
+            fields.weightManagerCurrentBodyType ??
+            profile.weightManagerCurrentBodyType
+        ),
       weight_manager_target_body_type:
-        fields.weight_manager_target_body_type ??
-        fields.weightManagerTargetBodyType ??
-        profile.weightManagerTargetBodyType,
+        toStoredWeightManagerBodyType(
+          fields.weight_manager_target_body_type ??
+            fields.weightManagerTargetBodyType ??
+            profile.weightManagerTargetBodyType
+        ),
       weight_manager_target_calories:
         fields.weight_manager_target_calories ??
         fields.weightManagerTargetCalories ??
