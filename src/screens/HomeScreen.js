@@ -9,6 +9,7 @@ import {
   Modal,
   TextInput,
   Alert,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -1657,6 +1658,7 @@ const HomeScreen = () => {
 };
 
 const createStyles = (themeColorsParam = colors, isDark = false) => {
+  const isAndroid = Platform.OS === 'android';
   const sectionCardColor = themeColorsParam?.card || colors.card;
   const sectionBorderColor = themeColorsParam?.border || colors.border || '#E5E7EB';
   const mutedBorder = isDark ? '#272A35' : '#EEE6FF';
@@ -1670,20 +1672,20 @@ const createStyles = (themeColorsParam = colors, isDark = false) => {
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: isAndroid ? '#E9E1D7' : colors.background,
     },
     scrollView: {
       flex: 1,
     },
     scrollContent: {
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: isAndroid ? spacing.sm : spacing.xl,
       paddingBottom: 100,
     },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: spacing.lg,
+      alignItems: isAndroid ? 'flex-start' : 'center',
+      paddingVertical: isAndroid ? spacing.sm : spacing.lg,
     },
     logoContainer: {
       flexDirection: 'row',
@@ -1705,15 +1707,18 @@ const createStyles = (themeColorsParam = colors, isDark = false) => {
     logoText: {
       ...typography.h2,
       color: colors.text,
+      fontSize: isAndroid ? 20 : typography.h2.fontSize,
+      textTransform: isAndroid ? 'uppercase' : 'none',
+      letterSpacing: isAndroid ? 1.4 : 0,
     },
     profileButton: {
-      width: 40,
-      height: 40,
-      borderRadius: borderRadius.full,
-      backgroundColor: colors.inputBackground,
+      width: isAndroid ? 32 : 40,
+      height: isAndroid ? 32 : 40,
+      borderRadius: isAndroid ? 2 : borderRadius.full,
+      backgroundColor: isAndroid ? '#D8CEC2' : colors.inputBackground,
       alignItems: 'center',
       justifyContent: 'center',
-      ...shadows.small,
+      ...(isAndroid ? {} : shadows.small),
     },
     profileImage: {
       width: 40,
@@ -1722,17 +1727,17 @@ const createStyles = (themeColorsParam = colors, isDark = false) => {
     },
     headerRight: {
       flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
+      alignItems: isAndroid ? 'flex-start' : 'center',
+      gap: isAndroid ? spacing.xs : spacing.sm,
     },
     headerIconButton: {
-      width: 40,
-      height: 40,
-      borderRadius: borderRadius.full,
+      width: isAndroid ? 32 : 40,
+      height: isAndroid ? 32 : 40,
+      borderRadius: isAndroid ? 2 : borderRadius.full,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.inputBackground,
-      ...shadows.small,
+      backgroundColor: isAndroid ? '#D8CEC2' : colors.inputBackground,
+      ...(isAndroid ? {} : shadows.small),
     },
     notificationDot: {
       position: 'absolute',
@@ -1800,33 +1805,33 @@ const createStyles = (themeColorsParam = colors, isDark = false) => {
       fontWeight: '500',
     },
     sectionCard: {
-      marginBottom: spacing.lg,
+      marginBottom: isAndroid ? spacing.sm : spacing.lg,
     },
     sectionCardGradient: {
       padding: 0,
       borderWidth: 0,
       backgroundColor: 'transparent',
-      borderRadius: borderRadius.xl,
+      borderRadius: isAndroid ? 2 : borderRadius.xl,
       overflow: 'hidden',
     },
     sectionCardFlat: {
       borderWidth: 1,
-      borderRadius: borderRadius.xl,
+      borderRadius: isAndroid ? 2 : borderRadius.xl,
       overflow: 'hidden',
     },
     sectionGradient: {
-      borderRadius: borderRadius.xl,
-      padding: spacing.lg,
-      borderWidth: 1,
+      borderRadius: isAndroid ? 2 : borderRadius.xl,
+      padding: isAndroid ? spacing.sm : spacing.lg,
+      borderWidth: isAndroid ? 2 : 1,
     },
     overviewCard: {
-      borderRadius: borderRadius.xxl,
-      ...shadows.large,
+      borderRadius: isAndroid ? 2 : borderRadius.xxl,
+      ...(isAndroid ? shadows.small : shadows.large),
     },
     overviewGradient: {
-      borderRadius: borderRadius.xxl,
-      paddingVertical: spacing.lg,
-      paddingHorizontal: spacing.lg,
+      borderRadius: isAndroid ? 2 : borderRadius.xxl,
+      paddingVertical: isAndroid ? spacing.sm : spacing.lg,
+      paddingHorizontal: isAndroid ? spacing.sm : spacing.lg,
     },
     sectionContent: {
       gap: spacing.sm,
@@ -2069,13 +2074,13 @@ const createStyles = (themeColorsParam = colors, isDark = false) => {
     },
     miniCard: {
       flex: 1,
-      borderRadius: borderRadius.lg,
-      borderWidth: 1,
+      borderRadius: isAndroid ? 2 : borderRadius.lg,
+      borderWidth: isAndroid ? 2 : 1,
       borderColor: mutedBorder,
       backgroundColor: sectionCardColor,
-      paddingVertical: spacing.lg,
-      paddingHorizontal: spacing.lg,
-      minHeight: 96,
+      paddingVertical: isAndroid ? spacing.sm : spacing.lg,
+      paddingHorizontal: isAndroid ? spacing.sm : spacing.lg,
+      minHeight: isAndroid ? 72 : 96,
       justifyContent: 'center',
       ...flatShadow,
     },

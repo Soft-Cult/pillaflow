@@ -9,6 +9,7 @@ import {
   TextInput,
   Animated,
   Easing,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../utils/supabaseClient';
@@ -2634,53 +2635,54 @@ const TasksScreen = () => {
 };
 
 const createStyles = (themeColors) => {
+  const isAndroid = Platform.OS === 'android';
   const backgroundColor = (themeColors && themeColors.background) || colors.background;
   const textColor = (themeColors && themeColors.text) || colors.text;
 
   return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: themeColors.background,
+    backgroundColor: isAndroid ? '#ECE6DC' : themeColors.background,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: isAndroid ? spacing.sm : spacing.xl,
     paddingBottom: 100,
     flexGrow: 1,
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: isAndroid ? 'flex-start' : 'center',
     justifyContent: 'space-between',
     marginTop: spacing.sm,
-    marginBottom: spacing.md,
+    marginBottom: isAndroid ? spacing.sm : spacing.md,
   },
   headerIntro: {
     flex: 1,
-    marginRight: spacing.md,
+    marginRight: isAndroid ? spacing.sm : spacing.md,
   },
   headerActions: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: -spacing.xs,
+    alignItems: isAndroid ? 'flex-start' : 'center',
+    marginRight: isAndroid ? 0 : -spacing.xs,
   },
   headerIconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
+    width: isAndroid ? 34 : 42,
+    height: isAndroid ? 34 : 42,
+    borderRadius: isAndroid ? 2 : 21,
+    borderWidth: isAndroid ? 2 : 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.sm,
+    marginRight: isAndroid ? spacing.xs : spacing.sm,
   },
   headerAddButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: isAndroid ? 36 : 42,
+    height: isAndroid ? 36 : 42,
+    borderRadius: isAndroid ? 2 : 21,
     overflow: 'hidden',
-    ...shadows.small,
+    ...(isAndroid ? {} : shadows.small),
   },
   headerAddButtonGradient: {
     flex: 1,
@@ -2689,12 +2691,15 @@ const createStyles = (themeColors) => {
   },
   pageTitle: {
     ...typography.h1,
-    fontSize: 34,
+    fontSize: isAndroid ? 24 : 34,
     fontWeight: '700',
+    textTransform: isAndroid ? 'uppercase' : 'none',
+    letterSpacing: isAndroid ? 1.2 : 0,
   },
   pageSubtitle: {
     ...typography.bodySmall,
     marginTop: 2,
+    fontSize: isAndroid ? 12 : typography.bodySmall.fontSize,
   },
   actionRow: {
     flexDirection: 'row',
@@ -2999,17 +3004,19 @@ const createStyles = (themeColors) => {
     marginBottom: 4,
   },
   sectionCard: {
-    marginBottom: spacing.lg,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
+    marginBottom: isAndroid ? spacing.sm : spacing.lg,
+    borderRadius: isAndroid ? 2 : borderRadius.xl,
+    borderWidth: isAndroid ? 2 : 1,
     overflow: 'hidden',
   },
   tasksCard: {
-    marginBottom: spacing.lg,
+    marginBottom: isAndroid ? spacing.sm : spacing.lg,
   },
   sectionTitle: {
     ...typography.h3,
-    marginBottom: spacing.md,
+    marginBottom: isAndroid ? spacing.sm : spacing.md,
+    fontSize: isAndroid ? 16 : typography.h3.fontSize,
+    textTransform: isAndroid ? 'uppercase' : 'none',
   },
   sectionHeaderRow: {
     flexDirection: 'row',

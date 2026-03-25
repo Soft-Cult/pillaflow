@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { G, Path, Circle } from 'react-native-svg';
 import { useNavigation } from '@react-navigation/native';
@@ -1870,6 +1870,7 @@ const FinanceScreen = () => {
 };
 
 const createStyles = (themeColorsParam, isDark = false) => {
+  const isAndroid = Platform.OS === 'android';
   const palette = themeColorsParam || colors;
   const text = palette.text || colors.text;
   const textSecondary = palette.textSecondary || colors.textSecondary;
@@ -1882,35 +1883,38 @@ const createStyles = (themeColorsParam, isDark = false) => {
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: pageBackground,
+      backgroundColor: isAndroid ? '#E5E9F2' : pageBackground,
     },
     scrollView: {
       flex: 1,
     },
     scrollContent: {
-      paddingHorizontal: spacing.xl,
-      paddingBottom: spacing.xxxl,
-      paddingTop: spacing.sm,
+      paddingHorizontal: isAndroid ? spacing.sm : spacing.xl,
+      paddingBottom: isAndroid ? spacing.xxl : spacing.xxxl,
+      paddingTop: isAndroid ? 0 : spacing.sm,
     },
     header: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: isAndroid ? 'flex-start' : 'center',
       justifyContent: 'space-between',
-      paddingVertical: spacing.md,
-      marginBottom: spacing.sm,
+      paddingVertical: isAndroid ? spacing.sm : spacing.md,
+      marginBottom: isAndroid ? spacing.xs : spacing.sm,
     },
     headerTitle: {
       ...typography.h1,
-      fontSize: 34,
+      fontSize: isAndroid ? 24 : 34,
       fontWeight: '700',
       textAlign: 'left',
       flex: 0,
       color: text,
+      textTransform: isAndroid ? 'uppercase' : 'none',
+      letterSpacing: isAndroid ? 1.2 : 0,
     },
     headerSubtitle: {
       ...typography.bodySmall,
       marginTop: 2,
       color: textSecondary,
+      fontSize: isAndroid ? 12 : typography.bodySmall.fontSize,
     },
     headerSpacer: {
       width: 0,
@@ -1918,27 +1922,27 @@ const createStyles = (themeColorsParam, isDark = false) => {
     dateRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: spacing.lg,
+      marginBottom: isAndroid ? spacing.sm : spacing.lg,
       justifyContent: 'space-between',
     },
     dateArrow: {
-      padding: spacing.sm,
-      borderRadius: borderRadius.full,
+      padding: isAndroid ? spacing.xs : spacing.sm,
+      borderRadius: isAndroid ? 2 : borderRadius.full,
       backgroundColor: palette.card,
-      borderWidth: 1,
+      borderWidth: isAndroid ? 2 : 1,
       borderColor: surfaceBorder,
-      ...shadows.small,
+      ...(isAndroid ? {} : shadows.small),
     },
     datePicker: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       paddingVertical: spacing.sm,
-      paddingHorizontal: spacing.lg,
-      borderRadius: borderRadius.full,
+      paddingHorizontal: isAndroid ? spacing.sm : spacing.lg,
+      borderRadius: isAndroid ? 2 : borderRadius.full,
       backgroundColor: palette.card,
-      marginHorizontal: spacing.sm,
-      borderWidth: 1,
+      marginHorizontal: isAndroid ? spacing.xs : spacing.sm,
+      borderWidth: isAndroid ? 2 : 1,
       borderColor: surfaceBorder,
       justifyContent: 'center',
     },

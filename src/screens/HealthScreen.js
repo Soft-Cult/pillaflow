@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, useWindowDimensions, TextInput, Modal as RNModal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, useWindowDimensions, TextInput, Modal as RNModal, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -2895,49 +2895,52 @@ const HealthScreen = () => {
 const createStyles = (themeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: themeColors.background,
+    backgroundColor: Platform.OS === 'android' ? '#EEE4DA' : themeColors.background,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingHorizontal: Platform.OS === 'android' ? spacing.sm : spacing.xl,
+    paddingTop: Platform.OS === 'android' ? spacing.sm : spacing.lg,
     paddingBottom: 100,
   },
   headerRow: {
-    marginBottom: spacing.md,
+    marginBottom: Platform.OS === 'android' ? spacing.sm : spacing.md,
   },
   pageTitle: {
     ...typography.h1,
-    fontSize: 34,
+    fontSize: Platform.OS === 'android' ? 24 : 34,
     fontWeight: '700',
     color: themeColors.text,
+    textTransform: Platform.OS === 'android' ? 'uppercase' : 'none',
+    letterSpacing: Platform.OS === 'android' ? 1.2 : 0,
   },
   pageSubtitle: {
     ...typography.bodySmall,
     marginTop: 2,
     color: themeColors.textSecondary,
+    fontSize: Platform.OS === 'android' ? 12 : typography.bodySmall.fontSize,
   },
   statsRow: {
     flexDirection: 'row',
-    marginTop: spacing.lg,
-    marginBottom: spacing.lg,
+    marginTop: Platform.OS === 'android' ? spacing.sm : spacing.lg,
+    marginBottom: Platform.OS === 'android' ? spacing.sm : spacing.lg,
   },
   statCard: {
     flex: 1,
-    marginHorizontal: spacing.xs,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
+    marginHorizontal: Platform.OS === 'android' ? 2 : spacing.xs,
+    padding: Platform.OS === 'android' ? spacing.sm : spacing.md,
+    borderRadius: Platform.OS === 'android' ? 2 : borderRadius.lg,
+    borderWidth: Platform.OS === 'android' ? 2 : 1,
   },
   statIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: Platform.OS === 'android' ? 24 : 32,
+    height: Platform.OS === 'android' ? 24 : 32,
+    borderRadius: Platform.OS === 'android' ? 2 : 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: Platform.OS === 'android' ? spacing.xs : spacing.sm,
   },
   statLabel: {
     ...typography.caption,
@@ -2951,9 +2954,9 @@ const createStyles = (themeColors) => StyleSheet.create({
     color: themeColors.textLight,
   },
   sectionCard: {
-    marginBottom: spacing.lg,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
+    marginBottom: Platform.OS === 'android' ? spacing.sm : spacing.lg,
+    borderRadius: Platform.OS === 'android' ? 2 : borderRadius.xl,
+    borderWidth: Platform.OS === 'android' ? 2 : 1,
     overflow: 'hidden',
   },
   lastCard: {
@@ -2961,8 +2964,10 @@ const createStyles = (themeColors) => StyleSheet.create({
   },
   sectionTitle: {
     ...typography.h3,
-    marginBottom: spacing.md,
+    marginBottom: Platform.OS === 'android' ? spacing.sm : spacing.md,
     color: themeColors.text,
+    fontSize: Platform.OS === 'android' ? 16 : typography.h3.fontSize,
+    textTransform: Platform.OS === 'android' ? 'uppercase' : 'none',
   },
   logHeaderRow: {
     flexDirection: 'row',
