@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, TextInput, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, TextInput, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, borderRadius, spacing, typography } from '../utils/theme';
 import { useApp } from '../context/AppContext';
@@ -119,24 +119,28 @@ const Input = ({
 const createStyles = (palette) =>
   StyleSheet.create({
     container: {
-      marginBottom: spacing.lg,
+      marginBottom: Platform.OS === 'android' ? spacing.md : spacing.lg,
     },
     label: {
       ...typography.label,
-      marginBottom: spacing.sm,
+      marginBottom: Platform.OS === 'android' ? 2 : spacing.sm,
+      fontSize: Platform.OS === 'android' ? 11 : typography.label.fontSize,
+      textTransform: Platform.OS === 'android' ? 'uppercase' : 'none',
+      letterSpacing: Platform.OS === 'android' ? 1.1 : 0,
       color: palette.text,
     },
     inputContainer: {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: palette.inputBackground,
-      borderRadius: borderRadius.md,
-      borderWidth: 1,
+      borderRadius: Platform.OS === 'android' ? 0 : borderRadius.md,
+      borderWidth: Platform.OS === 'android' ? 2 : 1,
       borderColor: palette.border,
-      paddingHorizontal: spacing.md,
+      paddingHorizontal: Platform.OS === 'android' ? spacing.sm : spacing.md,
+      minHeight: Platform.OS === 'android' ? 38 : undefined,
     },
     inputContainerFocused: {
-      borderColor: palette.primary,
+      borderColor: Platform.OS === 'android' ? palette.textLight : palette.primary,
       backgroundColor: palette.inputBackground,
     },
     inputContainerError: {
@@ -148,24 +152,24 @@ const createStyles = (palette) =>
     },
     inputContainerMultiline: {
       alignItems: 'flex-start',
-      paddingVertical: spacing.sm,
+      paddingVertical: Platform.OS === 'android' ? spacing.xs : spacing.sm,
     },
     input: {
       flex: 1,
-      fontSize: 16,
+      fontSize: Platform.OS === 'android' ? 15 : 16,
       color: palette.text,
-      paddingVertical: spacing.md,
+      paddingVertical: Platform.OS === 'android' ? spacing.sm : spacing.md,
     },
     inputMultiline: {
-      minHeight: 100,
+      minHeight: Platform.OS === 'android' ? 72 : 100,
       paddingTop: spacing.sm,
     },
     leftIcon: {
-      marginRight: spacing.sm,
+      marginRight: Platform.OS === 'android' ? spacing.xs : spacing.sm,
     },
     rightIcon: {
-      marginLeft: spacing.sm,
-      padding: spacing.xs,
+      marginLeft: Platform.OS === 'android' ? spacing.xs : spacing.sm,
+      padding: Platform.OS === 'android' ? 1 : spacing.xs,
     },
     errorText: {
       color: palette.danger || colors.danger,

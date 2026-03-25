@@ -338,6 +338,7 @@ const AuthScreen = ({ navigation }) => {
 const createStyles = (themeColorsParam = colors) => {
   const baseText = themeColorsParam?.text || colors.text;
   const mutedText = themeColorsParam?.textSecondary || colors.textSecondary;
+  const isAndroid = Platform.OS === 'android';
   const displayFont = Platform.select({
     ios: 'AvenirNext-DemiBold',
     android: 'sans-serif-condensed',
@@ -348,7 +349,7 @@ const createStyles = (themeColorsParam = colors) => {
       flex: 1,
     },
     content: {
-      paddingHorizontal: spacing.xl,
+      paddingHorizontal: isAndroid ? spacing.md : spacing.xl,
     },
     waveOverlay: {
       position: 'absolute',
@@ -387,7 +388,7 @@ const createStyles = (themeColorsParam = colors) => {
     backButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: spacing.md,
+      marginBottom: isAndroid ? spacing.sm : spacing.md,
       alignSelf: 'flex-start',
     },
     backText: {
@@ -397,22 +398,22 @@ const createStyles = (themeColorsParam = colors) => {
     },
     iconRow: {
       flexDirection: 'row',
-      justifyContent: 'center',
-      marginBottom: spacing.md,
+      justifyContent: isAndroid ? 'flex-start' : 'center',
+      marginBottom: isAndroid ? spacing.sm : spacing.md,
     },
     badge: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
+      width: isAndroid ? 30 : 34,
+      height: isAndroid ? 30 : 34,
+      borderRadius: isAndroid ? 4 : 17,
       alignItems: 'center',
       justifyContent: 'center',
-      marginHorizontal: spacing.xs,
+      marginHorizontal: isAndroid ? 2 : spacing.xs,
       ...shadows.small,
     },
     logoRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: isAndroid ? 'flex-start' : 'center',
       marginBottom: spacing.sm,
     },
     logoIcon: {
@@ -429,35 +430,36 @@ const createStyles = (themeColorsParam = colors) => {
       margin: 1,
     },
     logoTitle: {
-      fontSize: 30,
+      fontSize: isAndroid ? 26 : 30,
       fontWeight: '700',
       color: baseText,
       fontFamily: displayFont,
+      letterSpacing: isAndroid ? 1.1 : 0,
     },
     subtitle: {
       ...typography.bodySmall,
       color: mutedText,
-      textAlign: 'center',
-      marginBottom: spacing.lg,
+      textAlign: isAndroid ? 'left' : 'center',
+      marginBottom: isAndroid ? spacing.md : spacing.lg,
     },
     card: {
-      borderRadius: borderRadius.xl,
+      borderRadius: isAndroid ? 6 : borderRadius.xl,
       borderWidth: 1,
-      padding: spacing.lg,
+      padding: isAndroid ? spacing.md : spacing.lg,
       ...shadows.medium,
     },
     inputGroup: {
-      marginBottom: spacing.md,
+      marginBottom: isAndroid ? spacing.sm : spacing.md,
     },
     inputField: {
-      borderRadius: borderRadius.lg,
+      borderRadius: isAndroid ? 0 : borderRadius.lg,
       borderWidth: 1,
     },
     inputText: {
       color: baseText,
     },
     forgotPassword: {
-      alignSelf: 'flex-end',
+      alignSelf: isAndroid ? 'flex-start' : 'flex-end',
       marginBottom: spacing.sm,
     },
     linkText: {
@@ -469,10 +471,10 @@ const createStyles = (themeColorsParam = colors) => {
       marginBottom: spacing.sm,
     },
     ctaButton: {
-      borderRadius: borderRadius.full,
+      borderRadius: isAndroid ? 2 : borderRadius.full,
       overflow: 'hidden',
       marginTop: spacing.sm,
-      marginBottom: spacing.lg,
+      marginBottom: isAndroid ? spacing.md : spacing.lg,
     },
     ctaDisabled: {
       opacity: 0.6,
@@ -481,7 +483,7 @@ const createStyles = (themeColorsParam = colors) => {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: spacing.lg,
+      paddingVertical: isAndroid ? spacing.md : spacing.lg,
       paddingHorizontal: spacing.lg,
     },
     ctaText: {
@@ -496,13 +498,13 @@ const createStyles = (themeColorsParam = colors) => {
     createPrompt: {
       ...typography.bodySmall,
       color: mutedText,
-      textAlign: 'center',
+      textAlign: isAndroid ? 'left' : 'center',
       marginBottom: spacing.sm,
     },
     secondaryButton: {
       borderWidth: 1,
-      borderRadius: borderRadius.full,
-      paddingVertical: spacing.md,
+      borderRadius: isAndroid ? 2 : borderRadius.full,
+      paddingVertical: isAndroid ? spacing.sm : spacing.md,
       alignItems: 'center',
     },
     secondaryText: {

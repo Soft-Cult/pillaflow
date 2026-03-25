@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, View, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, borderRadius, spacing } from '../utils/theme';
 import { supabase } from '../utils/supabaseClient';
@@ -147,20 +147,26 @@ const Button = ({
 const createStyles = () =>
   StyleSheet.create({
     container: {
-      borderRadius: borderRadius.md,
+      borderRadius: Platform.OS === 'android' ? 2 : borderRadius.md,
       alignItems: 'center',
       justifyContent: 'center',
+      minHeight: Platform.OS === 'android' ? 34 : undefined,
+      borderWidth: Platform.OS === 'android' ? 1 : 0,
+      borderColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.08)' : 'transparent',
     },
     contentContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: Platform.OS === 'android' ? 'flex-start' : 'center',
+      width: Platform.OS === 'android' ? '100%' : undefined,
     },
     fullWidth: {
       width: '100%',
     },
     text: {
-      fontWeight: '600',
+      fontWeight: Platform.OS === 'android' ? '700' : '600',
+      textTransform: Platform.OS === 'android' ? 'uppercase' : 'none',
+      letterSpacing: Platform.OS === 'android' ? 1.1 : 0,
     },
     disabled: {
       opacity: 0.5,
@@ -211,33 +217,33 @@ const createStyles = () =>
 
     // Sizes
     smallContainer: {
-      paddingVertical: spacing.sm,
+      paddingVertical: Platform.OS === 'android' ? spacing.xs : spacing.sm,
       paddingHorizontal: spacing.md,
     },
     smallText: {
-      fontSize: 14,
+      fontSize: Platform.OS === 'android' ? 12 : 14,
     },
     mediumContainer: {
-      paddingVertical: spacing.md,
-      paddingHorizontal: spacing.lg,
+      paddingVertical: Platform.OS === 'android' ? spacing.sm : spacing.md,
+      paddingHorizontal: Platform.OS === 'android' ? spacing.md : spacing.lg,
     },
     mediumText: {
-      fontSize: 16,
+      fontSize: Platform.OS === 'android' ? 13 : 16,
     },
     largeContainer: {
-      paddingVertical: spacing.lg,
-      paddingHorizontal: spacing.xl,
+      paddingVertical: Platform.OS === 'android' ? spacing.md : spacing.lg,
+      paddingHorizontal: Platform.OS === 'android' ? spacing.lg : spacing.xl,
     },
     largeText: {
-      fontSize: 18,
+      fontSize: Platform.OS === 'android' ? 15 : 18,
     },
 
     // Icons
     iconLeft: {
-      marginRight: spacing.sm,
+      marginRight: Platform.OS === 'android' ? spacing.xs : spacing.sm,
     },
     iconRight: {
-      marginLeft: spacing.sm,
+      marginLeft: Platform.OS === 'android' ? spacing.xs : spacing.sm,
     },
   });
 

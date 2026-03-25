@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { colors, shadows, borderRadius, spacing } from '../utils/theme';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../utils/supabaseClient';
@@ -40,11 +40,11 @@ const createStyles = () =>
   StyleSheet.create({
     card: {
       backgroundColor: colors.card,
-      borderRadius: borderRadius.lg,
-      padding: spacing.lg,
-      ...shadows.medium,
-      borderWidth: 1,
-      borderColor: 'rgba(0,0,0,0.04)',
+      borderRadius: Platform.OS === 'android' ? 3 : borderRadius.lg,
+      padding: Platform.OS === 'android' ? spacing.md : spacing.lg,
+      ...(Platform.OS === 'android' ? shadows.small : shadows.medium),
+      borderWidth: Platform.OS === 'android' ? 2 : 1,
+      borderColor: Platform.OS === 'android' ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.04)',
     },
     elevated: {
       ...shadows.large,

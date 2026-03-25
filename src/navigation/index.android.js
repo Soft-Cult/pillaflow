@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   View,
+  Text,
   StyleSheet,
   ActivityIndicator,
   Pressable,
@@ -86,14 +87,14 @@ import StreakScreen from '../screens/StreakScreen';
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 const FRIENDS_GESTURE_DISTANCE = Math.round(Dimensions.get('window').width);
-const CHAT_BUTTON_SIZE = 60;
-const CHAT_BUTTON_LIFT = 14;
-const CHAT_BUTTON_SPACER = CHAT_BUTTON_SIZE;
+const CHAT_BUTTON_SIZE = 74;
+const CHAT_BUTTON_LIFT = 2;
+const CHAT_BUTTON_SPACER = 44;
 const TAB_FADE_DURATION_MS = 90;
 const TAB_FADE_START_OPACITY = 0.96;
-const TAB_BAR_CONTAINER_PADDING_HORIZONTAL = 12;
-const TAB_BAR_PADDING_HORIZONTAL = 14;
-const TAB_ICON_CENTER_OFFSET_FROM_BOTTOM = 33;
+const TAB_BAR_CONTAINER_PADDING_HORIZONTAL = 0;
+const TAB_BAR_PADDING_HORIZONTAL = 4;
+const TAB_ICON_CENTER_OFFSET_FROM_BOTTOM = 26;
 const PREMIUM_PROMPT_DELAY_MS = 1200;
 
 const QuickTabFade = ({ children }) => {
@@ -165,6 +166,7 @@ const CustomTabBar = ({ state, descriptors, navigation, styles, onTabBarLayout }
         {state.routes.map((route, index) => {
           const isFocused = state.index === index;
           const { options } = descriptors[route.key];
+          const tabLabel = String(options.tabBarLabel || options.title || route.name).toUpperCase();
 
           const onPress = () => {
             const event = navigation.emit({
@@ -231,9 +233,15 @@ const CustomTabBar = ({ state, descriptors, navigation, styles, onTabBarLayout }
                     name={iconName}
                     type={iconType}
                     color={iconColor}
-                    size={24}
+                    size={20}
                   />
                 </View>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.tabLabel, isFocused && styles.tabLabelFocused]}
+                >
+                  {tabLabel}
+                </Text>
               </Pressable>
               {index === gapIndex && (
                 <View style={styles.chatSpacer} pointerEvents="none" />
@@ -739,37 +747,50 @@ const createStyles = () =>
       bottom: 0,
       left: 0,
       right: 0,
-      alignItems: 'center',
+      alignItems: 'stretch',
       paddingHorizontal: TAB_BAR_CONTAINER_PADDING_HORIZONTAL,
-      paddingTop: 10,
+      paddingTop: 0,
       backgroundColor: 'transparent',
     },
     tabBar: {
       flexDirection: 'row',
       backgroundColor: colors.card,
-      borderRadius: borderRadius.lg,
-      paddingVertical: 8,
+      borderRadius: 0,
+      paddingVertical: 4,
       paddingHorizontal: TAB_BAR_PADDING_HORIZONTAL,
-      ...shadows.small,
-      elevation: 12,
-      borderTopWidth: 1,
-      borderColor: 'rgba(0,0,0,0.06)',
+      ...shadows.medium,
+      elevation: 4,
+      borderTopWidth: 2,
+      borderColor: 'rgba(0,0,0,0.14)',
     },
     tabItem: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 6,
+      paddingVertical: 2,
+      minHeight: 44,
     },
     tabItemFocused: {
-      transform: [{ translateY: -2 }],
+      transform: [{ translateY: 1 }],
     },
     tabIconContainer: {
-      width: 44,
-      height: 38,
-      borderRadius: borderRadius.md,
+      width: 34,
+      height: 28,
+      borderRadius: 3,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    tabLabel: {
+      width: '100%',
+      marginTop: -1,
+      fontSize: 8,
+      fontWeight: '700',
+      textAlign: 'left',
+      letterSpacing: 0.8,
+      color: colors.navInactive,
+    },
+    tabLabelFocused: {
+      color: colors.text,
     },
     chatSpacer: {
       width: CHAT_BUTTON_SPACER,
@@ -783,14 +804,14 @@ const createStyles = () =>
     },
     chatButton: {
       position: 'absolute',
-      left: '50%',
+      left: '52%',
       width: CHAT_BUTTON_SIZE,
       height: CHAT_BUTTON_SIZE,
-      borderRadius: CHAT_BUTTON_SIZE / 2,
+      borderRadius: 18,
       backgroundColor: '#4da6ff',
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 4,
+      borderWidth: 6,
       borderColor: colors.card,
       ...shadows.medium,
       elevation: 10,
